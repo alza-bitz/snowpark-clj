@@ -1,0 +1,27 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        com.snowflake/snowpark {:mvn/version "1.14.0"}
+        org.scicloj/noj {:mvn/version "2-beta18"}
+        metosin/malli {:mvn/version "0.16.4"}
+        potemkin/potemkin {:mvn/version "0.4.6"}}
+ :aliases
+ {:dev {:extra-paths ["dev" "test" "integration"]
+        :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
+                     org.clojure/tools.namespace {:mvn/version "1.5.0"}
+                     tortue/spy {:mvn/version "2.15.0"}}
+        :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"]}
+  :test {:extra-paths ["test"]
+         :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                      org.clojure/test.check {:mvn/version "1.1.1"}
+                      tortue/spy {:mvn/version "2.15.0"}
+                      circleci/bond {:mvn/version "0.6.0"}}
+         :main-opts ["-m" "cognitect.test-runner"
+                     "-d" "test"]
+         :exec-fn cognitect.test-runner.api/test}
+  :integration {:extra-paths ["integration"]
+                :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                             org.clojure/test.check {:mvn/version "1.1.1"}}
+                :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"]
+                :main-opts ["-m" "cognitect.test-runner"
+                            "-d" "integration"]
+                :exec-fn cognitect.test-runner.api/test}}}
