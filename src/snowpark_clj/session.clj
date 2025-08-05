@@ -3,8 +3,10 @@
   (:require [clojure.string :as str])
   (:import [com.snowflake.snowpark_java Session]))
 
-(def ^:dynamic *session*
-  "Thread-local session binding for REPL use")
+(defn create-session-builder
+  "Create a new SessionBuilder instance"
+  []
+  (Session/builder))
 
 (defn create-session
   "Create a Snowpark session with optional transformation functions.
@@ -23,7 +25,7 @@
   ([config]
    (create-session config {}))
   ([config opts]
-   (let [builder (Session/builder)
+   (let [builder (create-session-builder)
          configured-builder (if (string? config)
                               ;; Use configFile() for properties file path
                               (.configFile builder config)

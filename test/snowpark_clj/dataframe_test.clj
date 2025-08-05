@@ -1,13 +1,15 @@
 (ns snowpark-clj.dataframe-test
   "Unit tests for the dataframe namespace"
+  (:refer-clojure :exclude [filter sort])
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as str]
             [snowpark-clj.dataframe :as df]
             [snowpark-clj.convert :as convert]
-            [snowpark-clj.session :as session]
             [malli.core :as m]
+            [spy.assert :as assert]
             [spy.core :as spy]
-            [spy.assert :as assert]))
+            [spy.protocol :as protocol])
+  (:import [com.snowflake.snowpark_java Functions]))
 
 ;; Test data
 (def test-data
@@ -24,157 +26,261 @@
              [:department [:enum "Engineering" "Sales" "Marketing"]]
              [:salary [:int {:min 50000 :max 100000}]]]))
 
+(defprotocol MockSession
+  (createDataFrame [this rows schema] "Mock Session.createDataFrame method")
+  (table [this table-name] "Mock Session.table method"))
+
+(defprotocol MockDataFrame
+  (col [this col-name] "Mock DataFrame.col method")
+  (filter [this condition] "Mock DataFrame.filter method")
+  (select [this col-array] "Mock DataFrame.select method")
+  (limit [this n] "Mock DataFrame.limit method")
+  (sort [this col-array] "Mock DataFrame.sort method")
+  (groupBy [this col-array] "Mock DataFrame.groupBy method")
+  (join [this other-df join-expr join-type] "Mock DataFrame.join method"))
+
+(defn- mock-session []
+  (let [mock (protocol/mock MockSession
+                            (createDataFrame [_ _ _] "createDataFrame")
+                            (table [_ _] "table"))
+        spies (spy.protocol/spies mock)]
+    {:mock-session mock
+     :mock-session-spies spies}))
+
+(defn- mock-dataframe []
+  (let [mock (protocol/mock MockDataFrame
+                            (col [_ _] (Functions/col "col"))
+                            (filter [_ _] "filter")
+                            (select [_ _] "select")
+                            (limit [_ _] "limit")
+                            (sort [_ _] "sort")
+                            (groupBy [_ _] "groupBy")
+                            (join [_ _ _ _] "join"))
+        spies (protocol/spies mock)]
+    {:mock-dataframe mock
+     :mock-dataframe-spies spies}))
+
 (deftest test-create-dataframe
   (testing "Creating DataFrame from Clojure data (2-arity)"
-    ;; Mock the Snowpark API calls that require connection
-    (let [mock-session (reify Object (toString [_] "mock-session"))
-          mock-dataframe (reify Object (toString [_] "mock-dataframe"))
-          session-wrapper {:session mock-session :read-key-fn keyword :write-key-fn name}
-          create-spy (spy/spy (constantly mock-dataframe))]
-      (with-redefs [session/unwrap-session (constantly mock-session)
-                    session/get-write-key-fn (constantly name)
-                    convert/infer-schema (fn [_data _write-key-fn] (reify Object))
-                    convert/maps->rows (fn [_data _schema _write-key-fn] [])]
-                    
-        (with-redefs-fn {#'df/create-dataframe 
-                         (fn 
-                           ([session data]
-                            (df/create-dataframe session data (convert/infer-schema data (comp str/upper-case name))))
-                           ([session data schema]
-                            (create-spy session data schema)
-                            (df/wrap-dataframe mock-dataframe session)))}
-          #(let [result (df/create-dataframe session-wrapper test-data)]
-             (is (= mock-dataframe (:dataframe result)))
-             (is (= keyword (:read-key-fn result)))
-             (is (= name (:write-key-fn result)))
-             (assert/called-once? create-spy)))))))
-
-(deftest test-create-dataframe-empty-data
+    (let [{:keys [mock-session mock-session-spies]} (mock-session)
+          session-wrapper {:session mock-session 
+                           :read-key-fn keyword 
+                           :write-key-fn name}
+          mock-schema (reify Object (toString [_] "mock-schema"))
+          mock-rows []]
+      
+      (with-redefs [convert/infer-schema (fn [_data _write-key-fn] mock-schema)
+                    convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)] 
+        (let [result (df/create-dataframe session-wrapper test-data)]
+          
+          ;; Verify the result is properly wrapped
+          (is (contains? result :dataframe))
+          (is (= keyword (:read-key-fn result)))
+          (is (= name (:write-key-fn result)))
+          
+          ;; Verify that the mock session's createDataFrame was called correctly
+          (assert/called-once? (:createDataFrame mock-session-spies))
+          (assert/called-with? (:createDataFrame mock-session-spies) mock-session mock-rows mock-schema)))))
+  
+  (testing "Creating DataFrame from Clojure data with explicit Snowpark schema (3-arity)"
+    (let [{:keys [mock-session mock-session-spies]} (mock-session)
+          session-wrapper {:session mock-session 
+                           :read-key-fn keyword 
+                           :write-key-fn (comp str/upper-case name)}
+          snowpark-schema (convert/malli-schema->snowpark-schema test-employee-schema (comp str/upper-case name))
+          mock-rows []]
+      
+      (with-redefs [convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)]
+        (let [result (df/create-dataframe session-wrapper test-data snowpark-schema)]
+          
+          ;; Verify the result is properly wrapped
+          (is (contains? result :dataframe))
+          (is (= keyword (:read-key-fn result)))
+          (is (= "TEST" ((:write-key-fn result) :test)))
+          
+          ;; Verify that the mock session's createDataFrame was called correctly
+          (assert/called-once? (:createDataFrame mock-session-spies))
+          (assert/called-with? (:createDataFrame mock-session-spies) mock-session mock-rows snowpark-schema)))))
+  
   (testing "Creating DataFrame from empty data should throw exception"
     (is (thrown-with-msg? IllegalArgumentException 
                           #"Cannot create DataFrame from empty data"
                           (df/create-dataframe {:session nil :key-fn identity} [])))))
 
-(deftest test-create-dataframe-with-snowpark-schema
-  (testing "Creating DataFrame from Clojure data with explicit Snowpark schema (3-arity)"
-    ;; Mock the Snowpark API calls and test 3-arity version
-    (let [mock-session (reify Object (toString [_] "mock-session"))
-          mock-dataframe (reify Object (toString [_] "mock-dataframe"))
-          snowpark-schema (convert/malli-schema->snowpark-schema test-employee-schema (comp str/upper-case name))
-          create-spy (spy/spy (constantly mock-dataframe))]
-      (with-redefs [session/unwrap-session (constantly mock-session)
-                    df/create-dataframe (fn [session data schema]
-                                          (create-spy session data schema)
-                                          mock-dataframe)]
-        (let [result (df/create-dataframe {:session mock-session} test-data snowpark-schema)]
-          (is (= mock-dataframe result))
-          (assert/called-once? create-spy))))))
-
 (deftest test-table
   (testing "Table function calls session.table with correct parameters"
-    (let [mock-session (reify Object (toString [_] "mock-snowpark-session"))
-          table-name "test_table"
-          mock-dataframe (reify Object (toString [_] "mock-dataframe"))
-          table-spy (spy/spy (constantly mock-dataframe))]
-      (with-redefs [session/unwrap-session (constantly mock-session)
-                    df/table (fn [session name]
-                               (table-spy session name)
-                               mock-dataframe)]
-        (let [result (df/table {:session mock-session} table-name)]
-          (is (= mock-dataframe result))
-          (assert/called-once? table-spy))))))
+    (let [{:keys [mock-session mock-session-spies]} (mock-session)
+          session-wrapper {:session mock-session 
+                           :read-key-fn keyword 
+                           :write-key-fn (comp str/upper-case name)}
+          table-name "test_table"]
+
+      (let [result (df/table session-wrapper table-name)]
+        ;; Verify the result is properly wrapped
+        (is (= "table" (:dataframe result)))
+        (is (= (:read-key-fn session-wrapper) (:read-key-fn result)))
+        (is (= (:write-key-fn session-wrapper) (:write-key-fn result))))
+      
+      ;; Verify that the mock session's table was called correctly
+      (assert/called-once? (:table mock-session-spies))
+      (assert/called-with? (:table mock-session-spies) mock-session table-name))))
 
 (deftest test-select
   (testing "Select function converts columns and calls DataFrame.select"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe 
+                   :read-key-fn keyword 
+                   :write-key-fn (comp str/upper-case name)}
           columns [:name :salary]
-          mock-result (reify Object (toString [_] "selected-dataframe"))
-          select-spy (spy/spy (constantly mock-result))]
-      (with-redefs [df/select (fn [df cols]
-                                (select-spy df cols)
-                                mock-result)]
-        (let [result (df/select mock-df columns)]
-          (is (= mock-result result))
-          (assert/called-once? select-spy))))))
+          result (df/select test-df columns)]
+      
+      ;; Verify the result is properly wrapped
+      (is (= "select" (:dataframe result)))
+      (is (= (:read-key-fn test-df) (:read-key-fn result)))
+      (is (= (:write-key-fn test-df) (:write-key-fn result)))
+      
+      ;; Verify that the mock dataframe's select was called correctly
+      ;; The columns should be transformed to string array: ["NAME", "SALARY"]
+      (assert/called-once? (:select mock-dataframe-spies))
+      ;; Check the actual call arguments
+      (let [calls (spy/calls (:select mock-dataframe-spies))
+            [call-args] calls
+            [called-df called-array] call-args]
+        (is (= mock-dataframe called-df))
+        (is (= ["NAME" "SALARY"] (vec called-array)))))))
 
 (deftest test-df-filter
-  (testing "Filter function calls DataFrame.filter with condition"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
-          condition "salary > 50000"
-          mock-result (reify Object (toString [_] "filtered-dataframe"))
-          filter-spy (spy/spy (constantly mock-result))]
-      (with-redefs [df/df-filter (fn [df cond]
-                                   (filter-spy df cond)
-                                   mock-result)]
-        (let [result (df/df-filter mock-df condition)]
-          (is (= mock-result result))
-          (assert/called-once? filter-spy))))))
+  (testing "Filter function accepts Column objects and encoded column names"
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe :write-key-fn (comp str/upper-case name)}]
+      
+      (testing "with Column object"
+        (let [column-obj (Functions/col "SALARY")
+              result (df/df-filter test-df column-obj)]
+          ;; The result should be a wrapped dataframe
+          (is (= "filter" (:dataframe result)))
+          (is (= (:read-key-fn test-df) (:read-key-fn result)))
+          (is (= (:write-key-fn test-df) (:write-key-fn result)))
+          ;; Check that the underlying DataFrame.filter was called with the column object
+          (assert/called-once? (:filter mock-dataframe-spies))
+          (assert/called-with? (:filter mock-dataframe-spies) mock-dataframe column-obj)))
+      
+      (testing "with encoded column name"
+        (let [result (df/df-filter test-df :salary)]
+          ;; The result should be a wrapped dataframe
+          (is (= "filter" (:dataframe result)))
+          (is (= (:read-key-fn test-df) (:read-key-fn result)))
+          (is (= (:write-key-fn test-df) (:write-key-fn result)))
+          ;; Check that a Column was created using transformed name, then filter was called
+          (assert/called-once? (:col mock-dataframe-spies))
+          (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "SALARY")
+          (assert/called-n-times? (:filter mock-dataframe-spies) 2))))))
 
 (deftest test-limit
-  (testing "Limit function calls DataFrame.limit with correct parameter"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
-          n 10
-          mock-result (reify Object (toString [_] "limited-dataframe"))
-          limit-spy (spy/spy (constantly mock-result))]
-      (with-redefs [df/limit (fn [df num]
-                               (limit-spy df num)
-                               mock-result)]
-        (let [result (df/limit mock-df n)]
-          (is (= mock-result result))
-          (assert/called-once? limit-spy))))))
+  (testing "Limit function calls DataFrame.limit with integer value"
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe 
+                   :read-key-fn keyword 
+                   :write-key-fn (comp str/upper-case name)}
+          limit-count 10
+          result (df/limit test-df limit-count)]
+      
+      ;; Verify the result is properly wrapped
+      (is (= "limit" (:dataframe result)))
+      (is (= (:read-key-fn test-df) (:read-key-fn result)))
+      (is (= (:write-key-fn test-df) (:write-key-fn result)))
+      
+      ;; Verify that the mock dataframe's limit was called correctly
+      (assert/called-once? (:limit mock-dataframe-spies))
+      (assert/called-with? (:limit mock-dataframe-spies) mock-dataframe 10))))
 
 (deftest test-df-sort
-  (testing "Sort function handles single and multiple columns"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
+  (testing "Sort function handles single and multiple columns with column transformation"
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe 
+                   :read-key-fn keyword 
+                   :write-key-fn (comp str/upper-case name)}
           single-col :salary
-          multi-cols [:salary :name]
-          mock-result (reify Object (toString [_] "sorted-dataframe"))
-          sort-spy (spy/spy (constantly mock-result))]
-      (with-redefs [df/df-sort (fn [df cols]
-                                 (sort-spy df cols)
-                                 mock-result)]
-        ;; Test single column
-        (let [result1 (df/df-sort mock-df single-col)]
-          (is (= mock-result result1)))
-        
-        ;; Test multiple columns
-        (let [result2 (df/df-sort mock-df multi-cols)]
-          (is (= mock-result result2)))
-        
-        (assert/called-n-times? sort-spy 2)))))
+          multi-cols [:salary :name]]
+      
+      ;; Test single column
+      (let [result1 (df/df-sort test-df single-col)]
+        (is (= "sort" (:dataframe result1)))
+        (is (= (:read-key-fn test-df) (:read-key-fn result1)))
+        (is (= (:write-key-fn test-df) (:write-key-fn result1))))
+      
+      ;; Test multiple columns
+      (let [result2 (df/df-sort test-df multi-cols)]
+        (is (= "sort" (:dataframe result2)))
+        (is (= (:read-key-fn test-df) (:read-key-fn result2)))
+        (is (= (:write-key-fn test-df) (:write-key-fn result2))))
+      
+      ;; Verify sort was called twice with Column arrays
+      (assert/called-n-times? (:sort mock-dataframe-spies) 2)
+      
+      ;; Verify that .col was called with the transformed column names
+      ;; Single column call: "SALARY"
+      ;; Multiple column calls: "SALARY", "NAME"  
+      (assert/called-n-times? (:col mock-dataframe-spies) 3)
+      (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "SALARY")
+      (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "NAME"))))
 
 (deftest test-df-group-by
   (testing "Group-by function converts column names and calls DataFrame.groupBy"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe 
+                   :read-key-fn keyword 
+                   :write-key-fn (comp str/upper-case name)}
           columns [:department :age]
-          mock-result (reify Object (toString [_] "grouped-dataframe"))
-          group-by-spy (spy/spy (constantly mock-result))]
-      (with-redefs [df/df-group-by (fn [df cols]
-                                     (group-by-spy df cols)
-                                     mock-result)]
-        (let [result (df/df-group-by mock-df columns)]
-          (is (= mock-result result))
-          (assert/called-once? group-by-spy))))))
+          result (df/df-group-by test-df columns)]
+      
+      ;; Verify the result is properly wrapped
+      (is (= "groupBy" (:dataframe result)))
+      (is (= (:read-key-fn test-df) (:read-key-fn result)))
+      (is (= (:write-key-fn test-df) (:write-key-fn result)))
+      
+      ;; Verify that the mock dataframe's groupBy was called correctly
+      ;; The columns should be transformed based on to-columns-or-names 
+      (assert/called-once? (:groupBy mock-dataframe-spies))
+      ;; Check the actual call arguments  
+      (let [calls (spy/calls (:groupBy mock-dataframe-spies))
+            [call-args] calls
+            [called-df called-array] call-args]
+        (is (= mock-dataframe called-df))
+        (is (= ["DEPARTMENT" "AGE"] (vec called-array))))))
 
 (deftest test-join
   (testing "Join function handles different join types"
-    (let [left-df (reify Object (toString [_] "left-df"))
-          right-df (reify Object (toString [_] "right-df"))
-          join-expr "left.id = right.id"
-          mock-result (reify Object (toString [_] "joined-dataframe"))
-          join-spy (spy/spy (constantly mock-result))]
-      (with-redefs [df/join (fn [left right expr & [type]]
-                              (join-spy left right expr type)
-                              mock-result)]
-        ;; Test default join type (2-arity)
-        (let [result1 (df/join left-df right-df join-expr)]
-          (is (= mock-result result1)))
-        
-        ;; Test explicit join type (3-arity)
-        (let [result2 (df/join left-df right-df join-expr :left)]
-          (is (= mock-result result2)))
-        
-        (assert/called-n-times? join-spy 2)))))
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe 
+                   :read-key-fn keyword 
+                   :write-key-fn (comp str/upper-case name)}
+          other-mock-dataframe (reify 
+                                 Object
+                                 (toString [_] "other-mock-dataframe"))
+          other-df {:dataframe other-mock-dataframe
+                    :read-key-fn keyword 
+                    :write-key-fn (comp str/upper-case name)}
+          join-expr "left.id = right.id"]
+      
+      ;; Test default join type (2-arity)
+      (let [result1 (df/join test-df other-df join-expr)]
+        (is (= "join" (:dataframe result1)))
+        (is (= (:read-key-fn test-df) (:read-key-fn result1)))
+        (is (= (:write-key-fn test-df) (:write-key-fn result1))))
+      
+      ;; Test explicit join type (3-arity)
+      (let [result2 (df/join test-df other-df join-expr :left)]
+        (is (= "join" (:dataframe result2)))
+        (is (= (:read-key-fn test-df) (:read-key-fn result2)))
+        (is (= (:write-key-fn test-df) (:write-key-fn result2))))
+      
+      ;; Verify join was called twice with correct parameters
+      (assert/called-n-times? (:join mock-dataframe-spies) 2)
+      ;; First call with default join type (gets converted to "inner")
+      (assert/called-with? (:join mock-dataframe-spies) mock-dataframe other-mock-dataframe join-expr "inner")
+      ;; Second call with explicit join type (gets converted to "left")
+      (assert/called-with? (:join mock-dataframe-spies) mock-dataframe other-mock-dataframe join-expr "left"))))
 
 (deftest test-collect
   (testing "Collect function converts DataFrame to maps with proper key-fn"
@@ -295,56 +401,39 @@
           (is (= mock-schema result))
           (assert/called-once? schema-spy))))))
 
-; Create a protocol that matches what we need from DataFrame
-(defprotocol MockDataFrame
-  (col [this col-name] "Mock DataFrame.col method"))
-
-;; Helper function to create mock DataFrame with call tracking
-(defn- create-mock-dataframe []
-  (let [received-calls (atom [])]
-    {:received-calls received-calls
-     :mock-dataframe (reify MockDataFrame
-                       (col [_ col-name]
-                         (swap! received-calls conj col-name)
-                         (proxy [Object] [] (toString [] col-name)))
-                       Object
-                       (toString [_] "mock-snowpark-dataframe"))}))
-
 (deftest test-col
   (testing "Col function returns Column object with transformed name"
-    ;; Create a mock DataFrame object that has a .col method
-    (let [{:keys [received-calls mock-dataframe]} (create-mock-dataframe)
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
           test-df {:dataframe mock-dataframe :write-key-fn (comp str/upper-case name)}]
       
       ;; Test with keyword column name
       (let [result (df/col test-df :name)]
         (is (some? result))
-        (is (= "NAME" (str result)))
         ;; Verify the transformation was applied before calling .col
-        (is (= ["NAME"] @received-calls)))
+        (assert/called-once? (:col mock-dataframe-spies))
+        (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "NAME"))
       
-      ;; Reset and test with string column name
-      (reset! received-calls [])
+      ;; Test with string column name
       (let [result (df/col test-df "department")]
-        (is (some? result)) 
-        (is (= "DEPARTMENT" (str result)))
-        (is (= ["DEPARTMENT"] @received-calls)))))
+        (is (some? result))
+        (assert/called-n-times? (:col mock-dataframe-spies) 2)
+        (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "DEPARTMENT"))))
   
   (testing "Col function works with different write-key-fn transformations"
-    ;; Test different transformation functions using mock DataFrames with .col methods
+
     (testing "Lowercase transformation"
-      (let [{:keys [received-calls mock-dataframe]} (create-mock-dataframe)
+      (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
             lowercase-df {:dataframe mock-dataframe :write-key-fn (comp str/lower-case name)}
             result (df/col lowercase-df :COLUMN_NAME)]
         (is (some? result))
-        (is (= "column_name" (str result)))
-        (is (= ["column_name"] @received-calls))))
+        (assert/called-once? (:col mock-dataframe-spies))
+        (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "column_name")))
     
     (testing "String transformation (no case change)"
-      (let [{:keys [received-calls mock-dataframe]} (create-mock-dataframe)
+      (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
             identity-df {:dataframe mock-dataframe :write-key-fn str}
             result (df/col identity-df :column-name)]
         (is (some? result))
-        (is (= ":column-name" (str result)))
-        (is (= [":column-name"] @received-calls))))))
+        (assert/called-once? (:col mock-dataframe-spies))
+        (assert/called-with? (:col mock-dataframe-spies) mock-dataframe ":column-name"))))))
 

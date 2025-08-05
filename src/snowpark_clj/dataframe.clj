@@ -1,8 +1,7 @@
 (ns snowpark-clj.dataframe
   "DataFrame operations and transformations"
   (:require [snowpark-clj.convert :as convert]
-            [snowpark-clj.session :as session])
-  (:import [com.snowflake.snowpark_java Functions]))
+            [snowpark-clj.session :as session]))
 
 ;; Helper functions for wrapped DataFrames
 
@@ -82,9 +81,7 @@
          write-key-fn (session/get-write-key-fn session)
          rows (convert/maps->rows data schema write-key-fn)
          dataframe (.createDataFrame raw-session rows schema)]
-    ;;  FIXME why are we not using wrap-dataframe here?
-     (merge {:dataframe dataframe} 
-            (select-keys session [:read-key-fn :write-key-fn])))))
+     (wrap-dataframe dataframe session))))
 
 (defn table
   "Create a DataFrame from a Snowflake table.
@@ -135,16 +132,15 @@
    
    Args:
    - df: Wrapped DataFrame
-   - condition: Column object, value to transform into Column, or SQL expression string
+   - condition: Column object or encoded column name that will be decoded using write-key-fn
    
    Returns: Wrapped DataFrame"
   [df condition]
   (let [raw-df (unwrap-dataframe df)
         write-key-fn (:write-key-fn df)
-        col-condition (cond
-                        (string? condition) (Functions/expr condition)
-                        (instance? com.snowflake.snowpark_java.Column condition) condition
-                        :else (.col raw-df (write-key-fn condition)))
+        col-condition (if (instance? com.snowflake.snowpark_java.Column condition)
+                        condition
+                        (.col raw-df (write-key-fn condition)))
         result-df (.filter raw-df col-condition)]
     (wrap-dataframe result-df df)))
 
@@ -188,12 +184,13 @@
    - df: Wrapped DataFrame
    - cols: Single column or vector of columns (Column objects or encoded column names that will be decoded using write-key-fn)
    
-   Returns: GroupedDataFrame (note: this returns raw GroupedDataFrame as it's not a DataFrame)"
+   Returns: Wrapped GroupedDataFrame"
   [df cols]
   (let [raw-df (unwrap-dataframe df)
         write-key-fn (:write-key-fn df)
-        col-array (to-columns-or-names cols write-key-fn)]
-    (.groupBy raw-df col-array)))
+        col-array (to-columns-or-names cols write-key-fn)
+        result-grouped-df (.groupBy raw-df col-array)]
+    (wrap-dataframe result-grouped-df df)))
 
 (defn join
   "Join two DataFrames.

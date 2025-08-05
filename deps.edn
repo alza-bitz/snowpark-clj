@@ -13,8 +13,7 @@
   :test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}
                       org.clojure/test.check {:mvn/version "1.1.1"}
-                      tortue/spy {:mvn/version "2.15.0"}
-                      circleci/bond {:mvn/version "0.6.0"}}
+                      tortue/spy {:mvn/version "2.15.0"}}
          :main-opts ["-m" "cognitect.test-runner"
                      "-d" "test"]
          :exec-fn cognitect.test-runner.api/test}

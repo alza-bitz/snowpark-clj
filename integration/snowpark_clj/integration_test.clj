@@ -7,6 +7,7 @@
    [malli.generator :as mg]
    [snowpark-clj.convert :as convert]
    [snowpark-clj.dataframe :as df]
+   [snowpark-clj.functions :as fn]
    [snowpark-clj.session :as session]))
 
 ;; Test data and schema
@@ -101,7 +102,9 @@
       
       ;; Read from table and apply transformations
       (let [table-df (df/table *session* test-table-name)
-            filtered-df (df/df-filter table-df "SALARY > 65000")
+            salary-col (df/col table-df :salary)
+            salary-condition (fn/gt salary-col (fn/lit 65000))
+            filtered-df (df/df-filter table-df salary-condition)
             selected-df (df/select filtered-df [:name :salary])
             sorted-df (df/df-sort selected-df [:salary])
             limited-df (df/limit sorted-df 2)
@@ -256,7 +259,9 @@
       (is (= 1000 (df/df-count dataframe)))
       
       ;; Test filtering and aggregation on larger dataset
-      (let [filtered-df (df/df-filter dataframe "score > 50")
+      (let [score-col (df/col dataframe :score)
+            score-condition (fn/gt score-col (fn/lit 50))
+            filtered-df (df/df-filter dataframe score-condition)
             sample-data (df/df-take filtered-df 10)]
         (is (<= (count sample-data) 10))
         (is (every? #(> (:score %) 50) sample-data))))))
