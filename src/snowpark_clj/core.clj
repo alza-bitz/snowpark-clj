@@ -23,13 +23,11 @@
    limit
    join
    collect
-   show
-   first-row
+   show 
    save-as-table
    schema]
   
-  [snowpark-clj.functions
-  ;;  col
+  [snowpark-clj.functions 
    lit
    gt
    lt

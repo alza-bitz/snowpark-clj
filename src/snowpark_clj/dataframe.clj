@@ -269,23 +269,7 @@
   (let [limited-df (limit df n)]
     (collect limited-df)))
 
-(defn first-row
-  "Get the first row from a DataFrame.
-   
-   Args:
-   - df: Wrapped DataFrame
-   
-   Returns: Map or nil if empty with keys encoded using read-key-fn"
-  [df]
-  (first (df-take df 1)))
-
 ;; DataFrame write operations
-
-(defn write
-  "Get DataFrameWriter for writing DataFrame to various destinations"
-  [df]
-  (let [raw-df (unwrap-dataframe df)]
-    (.write raw-df)))
 
 (defn save-as-table
   "Save DataFrame as a table in Snowflake.
@@ -297,18 +281,17 @@
    - options: Optional map of Snowflake-specific options:
      {:partition-by [\"col1\" \"col2\"]     ; Partition columns
       :cluster-by [\"col1\" \"col2\"]       ; Cluster columns
-      :table-type \"transient\"            ; Table type
-      ...}                               ; Other Snowflake writer options
-   
-   Returns: Wrapped DataFrame"
+      :table-type \"transient\"             ; Table type
+      ...}                                  ; Other Snowflake writer options"
   ([df table-name]
-   (let [writer (write df)
-         result (.saveAsTable writer table-name)]
-     (wrap-dataframe result df)))
+   (let [raw-df (unwrap-dataframe df)
+         writer (.write raw-df)]
+     (.saveAsTable writer table-name)))
   ([df table-name mode]
    (save-as-table df table-name mode {}))
   ([df table-name mode options]
-   (let [writer (write df)
+   (let [raw-df (unwrap-dataframe df)
+         writer (.write raw-df)
          mode-str (case mode
                     :overwrite "overwrite"
                     :append "append"
@@ -320,9 +303,8 @@
          ;; Set additional options if provided
          writer (if (seq options)
                   (.options writer (into {} (map (fn [[k v]] [(name k) v]) options)))
-                  writer)
-         result (.saveAsTable writer table-name)]
-     (wrap-dataframe result df))))
+                  writer)]
+     (.saveAsTable writer table-name))))
 
 ;; Column reference functions
 

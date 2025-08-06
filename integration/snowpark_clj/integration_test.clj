@@ -124,12 +124,7 @@
       (let [table-df (df/table *session* test-table-name)
             row-count (df/df-count table-df)]
         (is (= 3 row-count)))
-      
-      (let [table-df (df/table *session* test-table-name)
-            first-row (df/first-row table-df)]
-        (is (map? first-row))
-        (is (contains? first-row :id)))
-      
+       
       (let [table-df (df/table *session* test-table-name)
             sample-rows (df/df-take table-df 2)]
         (is (= 2 (count sample-rows)))

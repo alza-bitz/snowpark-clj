@@ -1,6 +1,6 @@
 (ns snowpark-clj.dataframe-test
   "Unit tests for the dataframe namespace"
-  (:refer-clojure :exclude [filter sort])
+  (:refer-clojure :exclude [filter sort count])
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as str]
             [snowpark-clj.dataframe :as df]
@@ -37,7 +37,17 @@
   (limit [this n] "Mock DataFrame.limit method")
   (sort [this col-array] "Mock DataFrame.sort method")
   (groupBy [this col-array] "Mock DataFrame.groupBy method")
-  (join [this other-df join-expr join-type] "Mock DataFrame.join method"))
+  (join [this other-df join-expr join-type] "Mock DataFrame.join method")
+  (collect [this] "Mock DataFrame.collect method")
+  (show [this n] "Mock DataFrame.show method")
+  (count [this] "Mock DataFrame.count method")
+  (schema [this] "Mock DataFrame.schema method")
+  (write [this] "Mock DataFrame.write method"))
+
+(defprotocol MockDataFrameWriter
+  (saveAsTable [this table-name] "Mock DataFrameWriter.saveAsTable method")
+  (mode [this mode-str] "Mock DataFrameWriter.mode method")
+  (options [this options-map] "Mock DataFrameWriter.options method"))
 
 (defn- mock-session []
   (let [mock (protocol/mock MockSession
@@ -47,18 +57,44 @@
     {:mock-session mock
      :mock-session-spies spies}))
 
-(defn- mock-dataframe []
+(defn- mock-dataframe-writer []
+  (let [mock-with-options (protocol/mock MockDataFrameWriter
+                                      (saveAsTable [_ _] "saveAsTable")
+                                      (mode [_ _] nil)
+                                      (options [_ _] nil))
+        mock-with-mode (protocol/mock MockDataFrameWriter
+                            (saveAsTable [_ _] "saveAsTable")
+                            (mode [_ _] nil)
+                            (options [_ _] mock-with-options))
+        mock (protocol/mock MockDataFrameWriter
+                            (saveAsTable [_ _] "saveAsTable")
+                            (mode [_ _] mock-with-mode)
+                            (options [_ _] nil))]
+    {:mock-writer mock
+     :mock-writer-spies (protocol/spies mock)
+     :mock-writer-with-mode mock-with-mode
+     :mock-writer-with-mode-spies (protocol/spies mock-with-mode)
+     :mock-writer-with-options mock-with-options
+     :mock-writer-with-options-spies (protocol/spies mock-with-options)}))
+
+(defn- mock-dataframe 
+  [& {:keys [lazy-chain? mock-writer]
+      :or {lazy-chain? false mock-writer "mock-writer"}}]
   (let [mock (protocol/mock MockDataFrame
                             (col [_ _] (Functions/col "col"))
-                            (filter [_ _] "filter")
-                            (select [_ _] "select")
-                            (limit [_ _] "limit")
-                            (sort [_ _] "sort")
-                            (groupBy [_ _] "groupBy")
-                            (join [_ _ _ _] "join"))
-        spies (protocol/spies mock)]
+                            (filter [this _] (if lazy-chain? this "filter"))
+                            (select [this _] (if lazy-chain? this "select"))
+                            (limit [this _] (if lazy-chain? this "limit"))
+                            (sort [this _] (if lazy-chain? this "sort"))
+                            (groupBy [this _] (if lazy-chain? this "groupBy"))
+                            (join [this _ _ _] (if lazy-chain? this "join"))
+                            (collect [_] "mock-rows")
+                            (show [_ _] nil)
+                            (count [_] "mock-count")
+                            (schema [_] "mock-schema")
+                            (write [_] mock-writer))]
     {:mock-dataframe mock
-     :mock-dataframe-spies spies}))
+     :mock-dataframe-spies (protocol/spies mock)}))
 
 (deftest test-create-dataframe
   (testing "Creating DataFrame from Clojure data (2-arity)"
@@ -284,122 +320,134 @@
 
 (deftest test-collect
   (testing "Collect function converts DataFrame to maps with proper key-fn"
-    (let [mock-df {:dataframe (reify Object (toString [_] "mock-dataframe"))
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe
                    :read-key-fn keyword}
-          expected-data [{:ID 1 :NAME "Alice"} {:ID 2 :NAME "Bob"}]
-          collect-spy (spy/spy (constantly expected-data))]
-      (with-redefs [df/collect (fn [df]
-                                 (collect-spy df)
-                                 expected-data)]
-        ;; Test collect function (takes only df)
-        (let [result (df/collect mock-df)]
-          (is (= expected-data result)))
-        
-        (assert/called-once? collect-spy)))))
+          expected-result [{:id 1 :name "Alice"}]]
+      
+      (with-redefs [convert/rows->maps (spy/stub expected-result)]
+        (let [result (df/collect test-df)]
+          ;; Verify the result is the data returned by mock collect
+          (is (= expected-result result))
+
+          ;; Verify that the mock dataframe's collect was called correctly
+          (assert/called-once? (:collect mock-dataframe-spies))
+          (assert/called-with? (:collect mock-dataframe-spies) mock-dataframe)
+
+          (assert/called-once? convert/rows->maps)
+          (assert/called-with? convert/rows->maps "mock-rows" "mock-schema" keyword))))))
 
 (deftest test-show
   (testing "Show function calls DataFrame.show with correct parameters"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
-          show-spy (spy/spy (constantly nil))]
-      (with-redefs [df/show (fn [df & [n]]
-                              (show-spy df n)
-                              nil)]
-        ;; Test with default row count (1-arity)
-        (df/show mock-df)
-        
-        ;; Test with explicit row count (2-arity)
-        (df/show mock-df 5)
-        
-        (assert/called-n-times? show-spy 2)))))
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe
+                   :read-key-fn keyword 
+                   :write-key-fn (comp str/upper-case name)}]
+      
+      ;; Test with default row count (1-arity)
+      (df/show test-df)
+      
+      ;; Test with explicit row count (2-arity)
+      (df/show test-df 5)
+      
+      ;; Verify that the mock dataframe's show was called correctly
+      (assert/called-n-times? (:show mock-dataframe-spies) 2)
+      (assert/called-with? (:show mock-dataframe-spies) mock-dataframe 20)  ; default
+      (assert/called-with? (:show mock-dataframe-spies) mock-dataframe 5))))
 
 (deftest test-df-count
   (testing "Count function calls DataFrame.count"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
-          expected-count 42
-          count-spy (spy/spy (constantly expected-count))]
-      (with-redefs [df/df-count (fn [df]
-                                  (count-spy df)
-                                  expected-count)]
-        (let [result (df/df-count mock-df)]
-          (is (= expected-count result))
-          (assert/called-once? count-spy))))))
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe
+                   :read-key-fn keyword 
+                   :write-key-fn (comp str/upper-case name)}
+          result (df/df-count test-df)]
+      
+      ;; Verify the result is the count returned by mock
+      (is (= "mock-count" result))
+      
+      ;; Verify that the mock dataframe's count was called correctly
+      (assert/called-once? (:count mock-dataframe-spies))
+      (assert/called-with? (:count mock-dataframe-spies) mock-dataframe))))
 
 (deftest test-df-take
   (testing "Take function handles correct arity"
-    (let [mock-df {:dataframe (reify Object (toString [_] "mock-dataframe"))
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe {:lazy-chain? true})
+          test-df {:dataframe mock-dataframe
                    :read-key-fn keyword}
-          expected-data [{:ID 1 :NAME "Alice"}]
-          take-spy (spy/spy (constantly expected-data))]
-      (with-redefs [df/df-take (fn [df n]
-                                 (take-spy df n)
-                                 expected-data)]
-        ;; Test df-take with correct arity (takes df and n)
-        (let [result (df/df-take mock-df 1)]
-          (is (= expected-data result)))
-        
-        (assert/called-once? take-spy)))))
+          expected-result [{:id 1 :name "Alice"}]]
+      
+      (with-redefs [convert/rows->maps (spy/stub expected-result)]
+        (let [result (df/df-take test-df 1)]
 
-(deftest test-first-row
-  (testing "First-row function gets first row"
-    (let [mock-df {:dataframe (reify Object (toString [_] "mock-dataframe"))
-                   :read-key-fn keyword}
-          expected-row {:ID 1 :NAME "Alice"}
-          first-row-spy (spy/spy (constantly expected-row))]
-      (with-redefs [df/first-row (fn [df]
-                                   (first-row-spy df)
-                                   expected-row)]
-        ;; Test first-row with correct arity (takes only df)
-        (let [result (df/first-row mock-df)]
-          (is (= expected-row result)))
-        
-        (assert/called-once? first-row-spy)))))
+          ;; df-take uses limit + collect internally, so we verify the result
+          (is (= expected-result result))
 
-(deftest test-write
-  (testing "Write function returns DataFrameWriter"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
-          mock-writer (reify Object (toString [_] "mock-writer"))
-          write-spy (spy/spy (constantly mock-writer))]
-      (with-redefs [df/write (fn [df]
-                               (write-spy df)
-                               mock-writer)]
-        (let [result (df/write mock-df)]
-          (is (= mock-writer result))
-          (assert/called-once? write-spy))))))
+          ;; Verify that limit was called with the correct parameter on the limit mock
+          (assert/called-once? (:limit mock-dataframe-spies))
+          (assert/called-with? (:limit mock-dataframe-spies) mock-dataframe 1)
+
+          (assert/called-once? convert/rows->maps)
+          (assert/called-with? convert/rows->maps "mock-rows" "mock-schema" keyword))))))
 
 (deftest test-save-as-table
   (testing "Save-as-table function handles different modes and options"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
-          table-name "test_table"
-          mock-result (reify Object (toString [_] "saved"))
-          save-spy (spy/spy (constantly mock-result))]
-      (with-redefs [df/save-as-table (fn [df name & [mode options]]
-                                       (save-spy df name mode options)
-                                       mock-result)]
-        ;; Test simple save (2-arity)
-        (let [result1 (df/save-as-table mock-df table-name)]
-          (is (= mock-result result1)))
-        
-        ;; Test with mode (3-arity)
-        (let [result2 (df/save-as-table mock-df table-name :overwrite)]
-          (is (= mock-result result2)))
-        
-        ;; Test with mode and options (4-arity)
-        (let [result3 (df/save-as-table mock-df table-name :overwrite {:cluster-by ["col1"]})]
-          (is (= mock-result result3)))
-        
-        (assert/called-n-times? save-spy 3)))))
+    (let [table-name "test_table"]
+      
+      ;; Test simple save (2-arity)
+      (testing "2-arity version"
+        (let [{:keys [mock-writer mock-writer-spies]} (mock-dataframe-writer)
+              {:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe {:mock-writer mock-writer})
+              test-df {:dataframe mock-dataframe
+                       :read-key-fn keyword 
+                       :write-key-fn (comp str/upper-case name)}
+              result (df/save-as-table test-df table-name)]
+          (is (= "saveAsTable" result))
+          (assert/called-once? (:write mock-dataframe-spies))
+          (assert/called-once? (:saveAsTable mock-writer-spies))))
+      
+      ;; Test with mode (3-arity)
+      (testing "3-arity version"
+        (let [{:keys [mock-writer mock-writer-spies mock-writer-with-mode-spies]} (mock-dataframe-writer)
+              {:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe {:mock-writer mock-writer})
+              test-df {:dataframe mock-dataframe
+                       :read-key-fn keyword 
+                       :write-key-fn (comp str/upper-case name)}
+              result (df/save-as-table test-df table-name :overwrite)]
+          (is (= "saveAsTable" result))
+          (assert/called-once? (:write mock-dataframe-spies))
+          (assert/called-once? (:mode mock-writer-spies))
+          (assert/called-once? (:saveAsTable mock-writer-with-mode-spies))))
+      
+      ;; Test with mode and options (4-arity)
+      (testing "4-arity version"
+        (let [{:keys [mock-writer mock-writer-spies 
+                      mock-writer-with-mode-spies mock-writer-with-options-spies]} (mock-dataframe-writer)
+              {:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe {:mock-writer mock-writer})
+              test-df {:dataframe mock-dataframe
+                       :read-key-fn keyword 
+                       :write-key-fn (comp str/upper-case name)}
+              result (df/save-as-table test-df table-name :overwrite {:cluster-by ["col1"]})]
+          (is (= "saveAsTable" result))
+          (assert/called-once? (:write mock-dataframe-spies))
+          (assert/called-once? (:mode mock-writer-spies))
+          (assert/called-once? (:options mock-writer-with-mode-spies))
+          (assert/called-once? (:saveAsTable mock-writer-with-options-spies)))))))
 
 (deftest test-schema
   (testing "Schema function returns DataFrame schema"
-    (let [mock-df (reify Object (toString [_] "mock-dataframe"))
-          mock-schema (reify Object (toString [_] "mock-schema"))
-          schema-spy (spy/spy (constantly mock-schema))]
-      (with-redefs [df/schema (fn [df]
-                                (schema-spy df)
-                                mock-schema)]
-        (let [result (df/schema mock-df)]
-          (is (= mock-schema result))
-          (assert/called-once? schema-spy))))))
+    (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
+          test-df {:dataframe mock-dataframe
+                   :read-key-fn keyword 
+                   :write-key-fn (comp str/upper-case name)}
+          result (df/schema test-df)]
+      
+      ;; Verify the result is the schema returned by mock
+      (is (= "mock-schema" result))
+      
+      ;; Verify that the mock dataframe's schema was called correctly
+      (assert/called-once? (:schema mock-dataframe-spies))
+      (assert/called-with? (:schema mock-dataframe-spies) mock-dataframe))))
 
 (deftest test-col
   (testing "Col function returns Column object with transformed name"
