@@ -20,29 +20,19 @@
   (configFile [this file-path] "Mock SessionBuilder.configFile method")
   (create [this] "Mock SessionBuilder.create method"))
 
-(defprotocol MockSession
-  (close [this] "Mock Session.close method"))
-
-(defn- mock-builder [mock-session-builder-configured]
-  (let [mock (protocol/mock MockSessionBuilder
-                            (configs [_ _] mock-session-builder-configured)
-                            (configFile [_ _] mock-session-builder-configured))
-        spies (protocol/spies mock)]
+(defn- mock-builder []
+  (let [mock-configured (protocol/mock MockSessionBuilder
+                                       (configs [_ _] nil)
+                                       (configFile [_ _] nil)
+                                       (create [_] "mock-session"))
+        mock (protocol/mock MockSessionBuilder
+                            (configs [_ _] mock-configured)
+                            (configFile [_ _] mock-configured)
+                            (create [_] nil))]
     {:mock-builder mock
-     :mock-builder-spies spies}))
-
-(defn- mock-builder-configured [mock-session]
-  (let [mock (protocol/mock MockSessionBuilder
-                            (create [_] mock-session))
-        spies (protocol/spies mock)]
-    {:mock-builder-configured mock
-     :mock-builder-configured-spies spies}))
-
-(defn- mock-session []
-  (let [mock (protocol/mock MockSession)
-        spies (protocol/spies mock)]
-    {:mock-session mock
-     :mock-session-spies spies}))
+     :mock-builder-spies (protocol/spies mock)
+     :mock-builder-configured mock-configured
+     :mock-builder-configured-spies (protocol/spies mock-configured)}))
 
 (deftest test-unwrap-session
   (testing "Extracting raw session from wrapper"
@@ -76,9 +66,8 @@
 
 (deftest test-create-session
   (testing "Creating session with map config using SessionBuilder.configs()"
-    (let [{:keys [mock-session]} (mock-session)
-          {:keys [mock-builder-configured mock-builder-configured-spies]} (mock-builder-configured mock-session)
-          {:keys [mock-builder mock-builder-spies]} (mock-builder mock-builder-configured)
+    (let [{:keys [mock-builder mock-builder-spies
+                  mock-builder-configured-spies]} (mock-builder) 
           expected-config-map {"URL" "jdbc:snowflake://test.snowflakecomputing.com"
                                "USER" "testuser"
                                "PASSWORD" "testpass"
@@ -97,7 +86,7 @@
           ;; Check that the functions work correctly, not that they equal specific functions
           (is (= :test ((:read-key-fn result) "TEST")))
           (is (= "TEST" ((:write-key-fn result) :test)))
-          (is (= mock-session (:session result)))
+          (is (= "mock-session" (:session result)))
 
           ;; Verify the builder methods were called correctly
           (assert/called-once? (:configs mock-builder-spies))
@@ -105,9 +94,8 @@
           (assert/called-once? (:create mock-builder-configured-spies))))))
 
   (testing "Creating session with properties file path using SessionBuilder.configFile()"
-    (let [{:keys [mock-session]} (mock-session)
-          {:keys [mock-builder-configured mock-builder-configured-spies]} (mock-builder-configured mock-session)
-          {:keys [mock-builder mock-builder-spies]} (mock-builder mock-builder-configured)]
+    (let [{:keys [mock-builder mock-builder-spies
+                  mock-builder-configured-spies]} (mock-builder)]
 
       (with-redefs [session/create-session-builder (fn [] mock-builder)]
         (let [result (session/create-session "test.properties")]
@@ -120,7 +108,7 @@
           ;; Check that the functions work correctly, not that they equal specific functions
           (is (= :test ((:read-key-fn result) "TEST")))
           (is (= "TEST" ((:write-key-fn result) :test)))
-          (is (= mock-session (:session result)))
+          (is (= "mock-session" (:session result)))
 
           ;; Verify the builder methods were called correctly
           (assert/called-once? (:configFile mock-builder-spies))

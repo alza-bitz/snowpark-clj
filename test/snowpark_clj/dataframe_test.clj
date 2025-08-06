@@ -52,10 +52,9 @@
 (defn- mock-session []
   (let [mock (protocol/mock MockSession
                             (createDataFrame [_ _ _] "createDataFrame")
-                            (table [_ _] "table"))
-        spies (spy.protocol/spies mock)]
+                            (table [_ _] "table"))]
     {:mock-session mock
-     :mock-session-spies spies}))
+     :mock-session-spies (spy.protocol/spies mock)}))
 
 (defn- mock-dataframe-writer []
   (let [mock-with-options (protocol/mock MockDataFrameWriter
