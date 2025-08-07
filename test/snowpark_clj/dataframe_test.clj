@@ -1,15 +1,18 @@
 (ns snowpark-clj.dataframe-test
   "Unit tests for the dataframe namespace"
   (:refer-clojure :exclude [filter sort count])
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.string :as str]
-            [snowpark-clj.dataframe :as df]
-            [snowpark-clj.convert :as convert]
-            [malli.core :as m]
-            [spy.assert :as assert]
-            [spy.core :as spy]
-            [spy.protocol :as protocol])
-  (:import [com.snowflake.snowpark_java Functions]))
+  (:require
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]
+   [malli.core :as m]
+   [snowpark-clj.convert :as convert]
+   [snowpark-clj.dataframe :as df]
+   [snowpark-clj.schema :as schema]
+   [spy.assert :as assert]
+   [spy.core :as spy]
+   [spy.protocol :as protocol])
+  (:import
+   [com.snowflake.snowpark_java Functions]))
 
 ;; Test data
 (def test-data
@@ -104,7 +107,7 @@
           mock-schema (reify Object (toString [_] "mock-schema"))
           mock-rows []]
       
-      (with-redefs [convert/infer-schema (fn [_data _write-key-fn] mock-schema)
+      (with-redefs [schema/infer-schema (fn [_session _data] mock-schema)
                     convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)] 
         (let [result (df/create-dataframe session-wrapper test-data)]
           
@@ -122,7 +125,7 @@
           session-wrapper {:session mock-session 
                            :read-key-fn keyword 
                            :write-key-fn (comp str/upper-case name)}
-          snowpark-schema (convert/malli-schema->snowpark-schema test-employee-schema (comp str/upper-case name))
+          snowpark-schema (schema/malli-schema->snowpark-schema session-wrapper test-employee-schema)
           mock-rows []]
       
       (with-redefs [convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)]

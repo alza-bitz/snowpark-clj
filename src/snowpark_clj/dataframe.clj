@@ -1,7 +1,9 @@
 (ns snowpark-clj.dataframe
   "DataFrame operations and transformations"
-  (:require [snowpark-clj.convert :as convert]
-            [snowpark-clj.session :as session]))
+  (:require
+   [snowpark-clj.convert :as convert]
+   [snowpark-clj.schema :as schema]
+   [snowpark-clj.session :as session]))
 
 ;; Helper functions for wrapped DataFrames
 
@@ -73,7 +75,7 @@
   ([session data]
    (when (empty? data)
      (throw (IllegalArgumentException. "Cannot create DataFrame from empty data"))) 
-   (create-dataframe session data (convert/infer-schema data (session/get-write-key-fn session)))) 
+   (create-dataframe session data (schema/infer-schema session data))) 
   ([session data schema]
    (when (empty? data)
      (throw (IllegalArgumentException. "Cannot create DataFrame from empty data"))) 

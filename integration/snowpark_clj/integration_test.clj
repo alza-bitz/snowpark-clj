@@ -5,9 +5,9 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [malli.core :as m]
    [malli.generator :as mg]
-   [snowpark-clj.convert :as convert]
    [snowpark-clj.dataframe :as df]
    [snowpark-clj.functions :as fn]
+   [snowpark-clj.schema :as schema]
    [snowpark-clj.session :as session]))
 
 ;; Test data and schema
@@ -143,8 +143,7 @@
 (deftest test-feature-4-malli-schema-conversion
   (testing "Feature 4: Malli schema to Snowpark schema conversion"
     ;; Convert Malli schema to Snowpark schema
-    (let [write-key-fn (session/get-write-key-fn *session*)
-          snowpark-schema (convert/malli-schema->snowpark-schema test-employee-schema write-key-fn)]
+    (let [snowpark-schema (schema/malli-schema->snowpark-schema *session* test-employee-schema)]
       (is (some? snowpark-schema))
 
       ;; Create DataFrame with explicit schema
@@ -159,8 +158,7 @@
 
     ;; Test with generated data
     (let [generated-data (mg/generate [:vector {:gen/min 5 :gen/max 5} test-employee-schema])
-          write-key-fn (session/get-write-key-fn *session*)
-          snowpark-schema (convert/malli-schema->snowpark-schema test-employee-schema write-key-fn)
+          snowpark-schema (schema/malli-schema->snowpark-schema *session* test-employee-schema)
           dataframe (df/create-dataframe *session* generated-data snowpark-schema)]
 
       (is (= 5 (df/df-count dataframe)))
@@ -208,7 +206,7 @@
     ;; Test invalid schema conversion
     (is (thrown-with-msg? IllegalArgumentException
                           #"Only map schemas are supported"
-                          (convert/malli-schema->snowpark-schema (m/schema :string) (session/get-write-key-fn *session*))))))
+                          (schema/malli-schema->snowpark-schema *session* (m/schema :string))))))
 
 ;; Session Management Tests
 (deftest test-session-management

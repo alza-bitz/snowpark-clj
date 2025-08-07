@@ -1,9 +1,9 @@
 (ns snowpark-clj.core
   "Main API for Snowpark Clojure wrapper"
-  (:require [potemkin :refer [import-vars]]
-            [snowpark-clj.convert]
+  (:require [potemkin :refer [import-vars]] 
             [snowpark-clj.dataframe :as df]
             [snowpark-clj.functions]
+            [snowpark-clj.schema]
             [snowpark-clj.session])
   (:refer-clojure :exclude [filter sort group-by count take]))
 
@@ -13,7 +13,10 @@
    create-session
    close-session
    with-session]
-  
+ 
+  [snowpark-clj.schema
+   malli-schema->snowpark-schema]
+
   [snowpark-clj.dataframe
    create-dataframe
    table
@@ -42,10 +45,7 @@
    max-fn
    min-fn
    upper
-   lower]
-  
-  [snowpark-clj.convert
-   malli-schema->snowpark-schema])
+   lower])
 
 ;; Create clean aliases for prefixed functions that conflict with clojure.core
 ;; These preserve the original metadata (docstrings, arglists) from the prefixed versions
