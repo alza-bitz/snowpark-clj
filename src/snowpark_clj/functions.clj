@@ -48,7 +48,7 @@
   [col1 col2]
   (.leq col1 col2))
 
-(defn not-equal
+(defn neq
   "Not equal comparison"
   [col1 col2]
   (.not_equal col1 col2))
