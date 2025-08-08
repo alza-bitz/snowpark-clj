@@ -237,6 +237,87 @@
       ;; Clean up
       (sp/close-session session))))
 
+;; Feature 5 Integration Tests (Map-like Column Access)
+(deftest test-feature-5-map-like-column-access
+  (testing "Feature 5: Map-like access to columns"
+    ;; First create and save test data
+    (let [dataframe (sp/create-dataframe *session* test-data)]
+      (sp/save-as-table dataframe test-table-name :overwrite)
+      
+      ;; Read the table back to get a fresh dataframe for testing
+      (let [table-df (sp/table *session* test-table-name)]
+        
+        (testing "IFn access: (df :column)"
+          ;; Test accessing columns using dataframe as a function
+          (let [name-col (table-df :name)
+                salary-col (table-df :salary)
+                age-col (table-df :age)]
+            ;; Verify we get Column objects back
+            (is (instance? com.snowflake.snowpark_java.Column name-col))
+            (is (instance? com.snowflake.snowpark_java.Column salary-col))
+            (is (instance? com.snowflake.snowpark_java.Column age-col))
+            
+            ;; Test that we can use these columns in queries
+            (let [filtered-df (sp/filter table-df (sp/gt salary-col (sp/lit 65000)))
+                  results (sp/collect filtered-df)]
+              (is (= 2 (count results)))  ; Alice and Bob have salary > 65000
+              (is (every? #(> (:salary %) 65000) results)))))
+        
+        (testing "ILookup access: (:column df)"
+          ;; Test accessing columns using keyword lookup
+          (let [name-col (:name table-df)
+                department-col (:department table-df)
+                id-col (:id table-df)]
+            ;; Verify we get Column objects back
+            (is (instance? com.snowflake.snowpark_java.Column name-col))
+            (is (instance? com.snowflake.snowpark_java.Column department-col))
+            (is (instance? com.snowflake.snowpark_java.Column id-col))
+            
+            ;; Test that we can use these columns in queries
+            (let [selected-df (sp/select table-df [name-col department-col])
+                  results (sp/collect selected-df)]
+              (is (= 3 (count results)))
+              (is (every? #(contains? % :name) results))
+              (is (every? #(contains? % :department) results))
+              (is (not-any? #(contains? % :salary) results)))))  ; salary should not be in results
+        
+        (testing "Non-existent column returns nil"
+          ;; Test both access patterns return nil for non-existent columns
+          (is (nil? (table-df :non-existent-column)))
+          (is (nil? (:also-non-existent table-df)))
+          (is (nil? (table-df :invalid-field)))
+          (is (nil? (:missing-column table-df))))
+        
+        (testing "Mixed column access patterns work together"
+          ;; Test combining both access patterns in the same query
+          (let [name-col (table-df :name)        ; IFn access
+                salary-col (:salary table-df)    ; ILookup access
+                condition (sp/eq salary-col (sp/lit 70000))  ; Equal to 70000, not greater than
+                selected-df (sp/select table-df [name-col salary-col])
+                filtered-df (sp/filter selected-df condition)
+                results (sp/collect filtered-df)]
+            (is (= 1 (count results)))  ; Only Alice has salary = 70000
+            (let [alice (first results)]
+              (is (= "Alice" (:name alice)))
+              (is (= 70000 (:salary alice))))))
+        
+        (testing "Column access with case transformation"
+          ;; Test that column names are properly transformed (lowercase keywords to uppercase strings)
+          (let [mixed-case-col (table-df :DePaRtMeNt)  ; Should work regardless of case in keyword
+                upper-col (:SALARY table-df)
+                lower-col (:name table-df)]
+            ;; All should return Column objects since the dataframe uses case-insensitive transforms
+            (is (instance? com.snowflake.snowpark_java.Column mixed-case-col))
+            (is (instance? com.snowflake.snowpark_java.Column upper-col))
+            (is (instance? com.snowflake.snowpark_java.Column lower-col))
+            
+            ;; Test in a real query
+            (let [selected-df (sp/select table-df [lower-col upper-col])
+                  results (sp/collect selected-df)]
+              (is (= 3 (count results)))
+              (is (every? #(contains? % :name) results))
+              (is (every? #(contains? % :salary) results)))))))))
+
 ;; Performance and Scalability Tests
 (deftest test-performance-scalability
   (testing "Library handles larger datasets efficiently"
