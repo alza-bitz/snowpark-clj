@@ -27,7 +27,7 @@ Although the Snowpark library has Java/Scala bindings, it doesn't provide any Cl
 
 ### Requirements
 1. Create a Snowpark session
-2. Read and compute over Snowflake table(s) on-cluster, beginning by wrapping Session.table(..)
+2. Read by wrapping Session.table(..) and then compute over Snowflake table(s) on-cluster
 3. Copy the result from cluster to local, wrapping DataFrame.collect()
 4. Transform the result from Snowpark rows to a vector of maps
 5. Close the session.
@@ -47,7 +47,10 @@ Although the Snowpark library has Java/Scala bindings, it doesn't provide any Cl
 ## Feature 5 - Map-like access to columns
 
 ### Requirements
-The wrapped dataset should present like a Clojure map. As in, the columns of the wrapped dataset must be accessible in the same way that keys can be used to access the values of a Clojure map.
+The wrapped dataset should present like a Clojure map. As in, the columns of the wrapped dataset must be accessible in the same way that keys can be used to access the values of a Clojure map. I'm looking to emulate what Tablecloth does here.
+```clojure
+(df :name) or (:name df)
+```
 
 ## Feature 6 - Convert to tech.ml.dataset or Tablecloth dataset
 
@@ -56,8 +59,10 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 - As per feature 2 except at step 4, transform the result from Snowpark rows, including the schema, to a tech.ml.dataset or Tablecloth dataset for further processing with Tableplot or other Scicloj libraries.
 
 ## Features that are planned but have not yet been elaborated
-- Surely I will need a wrapper around the Column API? Where returned columns are wrapped??
-- Handle RelationalGroupedDataFrame (how? wrap it? need to understand how it's used with agg)
+- A wrapper around the Column API? Where returned columns are wrapped??
+- Support for adding column(s) to a dataset
+- Support for joins w/ integration tests
+- Support for grouping & aggs w/ integration tests
 - Streaming read: local row iterator / transducer 
 - Streaming write?
 - Load data from stage using DataFrameReader

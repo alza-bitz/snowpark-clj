@@ -5,7 +5,7 @@
             [snowpark-clj.functions :as fn]
             [snowpark-clj.schema]
             [snowpark-clj.session])
-  (:refer-clojure :exclude [filter sort group-by count take 
+  (:refer-clojure :exclude [filter sort group-by count take
                             and or not abs max min]))
 
 ;; Re-export functions from other layers with preserved docstrings and arglists
@@ -64,6 +64,14 @@
 (def ^{:arglists (:arglists (meta #'df/df-take))
        :doc (:doc (meta #'df/df-take))}
   take df/df-take)
+
+;; (def ^{:arglists (:arglists (meta #'df/df-keys))
+;;        :doc (:doc (meta #'df/df-keys))}
+;;   keys df/df-keys)
+
+;; (def ^{:arglists (:arglists (meta #'df/df-vals))
+;;        :doc (:doc (meta #'df/df-vals))}
+;;   vals df/df-vals)
 
 ;; Same as above but done declaratively / data-driven style
 (let [alias-mappings [['fn/and-fn 'and]
