@@ -61,9 +61,9 @@
       ;; Verify DataFrame was created successfully
       (is (some? dataframe))
       (is (map? dataframe))
-      (is (:dataframe dataframe))
-      (is (:read-key-fn dataframe))
-      (is (:write-key-fn dataframe))
+      (is (:dataframe @dataframe))
+      (is (:read-key-fn @dataframe))
+      (is (:write-key-fn @dataframe))
       
       ;; Check schema
       (let [schema (sp/schema dataframe)]

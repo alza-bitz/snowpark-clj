@@ -109,8 +109,7 @@
      :mock-dataframe-spies (protocol/spies mock)}))
 
 (defn- mock-dataframe-wrapped
-  "Helper function that returns a simple map structure for legacy tests.
-   This allows existing tests to continue working without modification."
+  "Helper function that returns a minimal wrapper for tests."
   [df]
   (reify
     clojure.lang.IDeref
@@ -505,9 +504,8 @@
         (assert/called-once? (:col mock-dataframe-spies))
                 (assert/called-with? (:col mock-dataframe-spies) mock-dataframe ":column-name")))))
 
-;; Feature 5: Map-like access to columns
-(deftest test-map-like-column-access
-  (testing "DataFrame wrapper supports map-like column access"
+(deftest test-wrap-dataframe
+  (testing "DataFrame wrapper supports map-like column access (feature 5)"
     (let [{:keys [mock-schema]} (mock-schema #{"NAME" "SALARY" "AGE" "DEPARTMENT" "ID"})
           {:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe {:mock-schema mock-schema})
           test-df (df/wrap-dataframe mock-dataframe {:write-key-fn (comp str/upper-case name)
