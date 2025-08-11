@@ -1,0 +1,23 @@
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        type: string
+      test:
+        type: boolean
+        default: true
+env:
+  GH_PACKAGES_USR: ${{ secrets.GH_PACKAGES_USR }}
+  GH_PACKAGES_PSW: ${{ secrets.GH_PACKAGES_PSW }}
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }} # https://stackoverflow.com/a/71158878
+
+jobs:
+  test:
+    if: ${{ inputs.test == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/clojure-setup
+        with:
+          java-version: ${{ inputs.java-version }}
+      - run: clojure -M:test

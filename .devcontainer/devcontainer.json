@@ -5,14 +5,16 @@
 	"build": {
 		"dockerfile": "Dockerfile",
 		"args": {
-			"BASE_IMAGE": "temurin-21-tools-deps-jammy",
+			"BASE_IMAGE": "temurin-11-tools-deps-jammy",
 			"USERNAME": "${localEnv:USER:vscode}"
 		}
 	},
 	"remoteUser": "${localEnv:USER}",
 	"containerUser": "${localEnv:USER}",
 	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
 		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/devcontainers/features/github-cli:1": {},
 		"ghcr.io/devcontainers-extra/features/apt-get-packages:1": {
 			// libx* required to load tech.v3.libs.buffered-image
 			// libgomp1 required for xgboost4j
