@@ -11,13 +11,15 @@ The library should implement the following layers as namespaces:
 
 # Core layer
 - The external API used by clients.
+- It should be based on the facade pattern, where we expose the required functions in a uniform manner.
 - It should re-export functions from the other layers using import-vars from potemkin to preserve the arguments and docstrings.
 - When function names in other layers have been prefixed or suffixed to avoid collisions with Clojure core, those prefixed functions should not be re-exported directly. Instead those functions should be re-exported without the prefix or suffix, whilst still preserving the arguments and docstrings
 - It should use `(:refer-clojure :exclude [<functions whose names collide with clojure core>])` to avoid name collision warnings with clojure.core
 - It should allow for thread last over Snowpark dataframes (as we would with lazy sequences) to build Snowpark transformations.
 
 # Session layer
-- The internal API for creating sessions, closing sessions and session management generally.
+- The internal API for Snowpark session functions.
+- It should be based on the builder pattern, where we wrap the Snowpark session in a map and modify state through successive function calls.
 - It should provide a function giving two ways to create a session.
 - The first way is by providing a map argument with keywords corresponding to the properties allowed for Snowpark, passed to SessionBuilder.configs().
 - The second way is by providing the path to a properties file, passed to SessionBuilder.configFile().
@@ -27,14 +29,14 @@ The library should implement the following layers as namespaces:
 - The create-session function must return a map wrapping the session and the options.
 
 # Schema layer
-- The internal API for schema-related functions.
+- The internal API for Snowpark schema functions.
 - It should include a function for inferring a Snowpark schema from a coll of Clojure maps and a wrapped session providing write-key-fn.
 - It should include a function for creating a Snowpark schema from a Malli schema and a wrapped session providing write-key-fn.
 - All schema field name conversions must be done with read-key-fn and write-key-fn functions only.
 
 # Dataframe layer
-- The internal API for dataframe operations.
-- Function names must be prefixed with df- when the names would otherwise collide with Clojure core.
+- The internal API for Snowpark dataframe functions.
+- It should be based on the builder pattern, where we wrap the Snowpark dataframe in a map and modify state through successive function calls.
 - It should provide a function giving two ways to create a dataframe.
 - The first way is without a schema arg, for development convenience. In this case the schema should be inferred from the first row.
 - The second way is with a schema arg, as expected by `Session.createDataFrame(..)`
@@ -46,6 +48,7 @@ The library should implement the following layers as namespaces:
 - All functions must be implemented without using string SQL expressions where possible.
 - Any functions wrapping Snowpark dataframe creation methods must return a map wrapping the dataframe and the options from the session wrapper argument.
 - Any functions wrapping Snowpark eager transformation methods must return a map wrapping the dataframe and the options from the dataframe wrapper argument.
+- Function names must be prefixed with df- when the names would otherwise collide with Clojure core.
 
 # Functions layer
 - The internal API for Snowpark column functions and expressions.
@@ -53,7 +56,7 @@ The library should implement the following layers as namespaces:
 - Use either fijit or finagle-clojure for any required Scala interop with the Snowpark Functions API, for example to support complex column expressions.
 
 # Convert layer
-- The internal API for data conversions.
+- The internal API for data conversion functions.
 - It should include functions for converting data from Clojure to Snowpark and back again.
 - All conversion functions must take read-key-fn or write-key-fn args as appropriate and use those functions when converting.
 - All table column name conversions must be done with read-key-fn and write-key-fn functions only.
@@ -81,7 +84,7 @@ The library should implement the following layers as namespaces:
 - If real column objects are required by the function under test, they can be created using Functions.col(..).
 
 # All layers: integration tests
-- The integration tests must verify each feature using the public API, so the core namespace should be used instead of the other internal namespaces directly.
+- The integration tests must verify each feature using the public API, so the external core namespace should be used instead of the other internal namespaces directly.
 - Every feature under test should have a single test named `test-feature-n-<description>`.
 - For each feature under test, different test scenarios such as success and failure can be accommodated by using the `testing` macro from clojure.test.
 - Use test fixtures to create a session and load test data to a temporary Snowflake table using dataframe/save-as-table before running each test, and to delete any temporary tables afterwards

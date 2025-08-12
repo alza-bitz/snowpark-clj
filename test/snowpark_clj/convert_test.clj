@@ -93,7 +93,7 @@
       (is (= (:department employee) (:department result)))
       (is (= (:salary employee) (:salary result)))))
   
-  (testing "Row to map conversion with different key transformation"
+  (testing "Row to map conversion with different key decoding functions"
     (let [test-map {:id 1 :name "Alice" :department "Engineering" :salary 75000}
           write-key-fn (comp str/upper-case name)
           session {:write-key-fn write-key-fn}

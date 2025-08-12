@@ -17,7 +17,7 @@
    Args:
    - m: Clojure map to convert
    - schema: Snowpark schema
-   - write-key-fn: Function to transform keys when matching schema fields"
+   - write-key-fn: Function to decode keys when matching schema fields"
   [m schema write-key-fn]
   (let [field-names (.names schema)
         ;; Create a case-insensitive lookup by normalizing both map keys and field names

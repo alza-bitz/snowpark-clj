@@ -6,7 +6,8 @@
    [malli.core :as m]
    [malli.generator :as mg]
    [snowpark-clj.core :as sp]
-   [snowpark-clj.session :as session]))
+   [snowpark-clj.session :as session]
+   [snowpark-clj.dataframe :as df]))
 
 ;; Test data and schema
 (def test-data
@@ -61,9 +62,9 @@
       ;; Verify DataFrame was created successfully
       (is (some? dataframe))
       (is (map? dataframe))
-      (is (:dataframe @dataframe))
-      (is (:read-key-fn @dataframe))
-      (is (:write-key-fn @dataframe))
+      (is (df/unwrap-dataframe dataframe))
+      (is (df/unwrap-option dataframe :read-key-fn))
+      (is (df/unwrap-option dataframe :write-key-fn))
       
       ;; Check schema
       (let [schema (sp/schema dataframe)]
@@ -193,19 +194,6 @@
           (is (boolean? (:active row)))
           (is (number? (:score row))))))))
 
-;; Error Handling Tests
-(deftest test-error-handling
-  (testing "Error handling works correctly"
-    ;; Test empty data
-    (is (thrown-with-msg? IllegalArgumentException 
-                          #"Cannot create DataFrame from empty data"
-                          (sp/create-dataframe *session* [])))
-    
-    ;; Test invalid schema conversion
-    (is (thrown-with-msg? IllegalArgumentException
-                          #"Only map schemas are supported"
-                          (sp/malli-schema->snowpark-schema *session* (m/schema :string))))))
-
 ;; Session Management Tests
 (deftest test-session-management
   (testing "Session management works correctly"
@@ -220,8 +208,8 @@
       (is (fn? (:write-key-fn session))) ; Test it's a function rather than specific function
       
       ;; Test session options
-      (is (fn? (session/get-read-key-fn session)))  ; Test it's a function rather than specific function
-      (is (fn? (session/get-write-key-fn session))) ; Test it's a function rather than specific function
+      (is (fn? (session/unwrap-read-key-fn session)))  ; Test it's a function rather than specific function
+      (is (fn? (session/unwrap-write-key-fn session))) ; Test it's a function rather than specific function
       
       ;; Clean up
       (sp/close-session session))

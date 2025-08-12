@@ -41,18 +41,18 @@
           result (session/unwrap-session session-wrapper)]
       (is (= mock-session result)))))
 
-(deftest test-get-read-key-fn
+(deftest test-unwrap-read-key-fn
   (testing "Extracting read-key-fn from wrapper"
     (let [custom-read-key-fn keyword
           session-wrapper {:session {:mock true} :read-key-fn custom-read-key-fn}
-          result (session/get-read-key-fn session-wrapper)]
+          result (session/unwrap-read-key-fn session-wrapper)]
       (is (= custom-read-key-fn result)))))
 
-(deftest test-get-write-key-fn
+(deftest test-unwrap-write-key-fn
   (testing "Extracting write-key-fn from wrapper"
     (let [custom-write-key-fn name
           session-wrapper {:session {:mock true} :write-key-fn custom-write-key-fn}
-          result (session/get-write-key-fn session-wrapper)]
+          result (session/unwrap-write-key-fn session-wrapper)]
       (is (= custom-write-key-fn result)))))
 
 (deftest test-close-session

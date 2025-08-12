@@ -25,7 +25,8 @@
 		"vscode": {
 			"extensions": [
 				"betterthantomorrow.calva",
-				"betterthantomorrow.calva-backseat-driver"
+				"betterthantomorrow.calva-backseat-driver",
+				"GitHub.vscode-github-actions"
 			]
 		}
 	}

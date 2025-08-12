@@ -55,7 +55,6 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 ## Feature 6 - Convert to tech.ml.dataset or Tablecloth dataset
 
 ### Requirements
-- Add a function for converting Snowpark rows and schema to tech.ml.dataset or Tablecloth datasets.
 - As per feature 2 except at step 4, transform the result from Snowpark rows, including the schema, to a tech.ml.dataset or Tablecloth dataset for further processing with Tableplot or other Scicloj libraries.
 
 ## Features that are planned but have not yet been elaborated
@@ -71,6 +70,6 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 - Create dataframe from range, wrapping Session.range()
 - SQL execution
 - UDFs
-- Stored procedures 
+- Stored procedures
 - Async
 - Load a tech.ml.dataset or Tablecloth dataset from local and save to a Snowflake table
