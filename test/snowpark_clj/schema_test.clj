@@ -41,11 +41,15 @@
   (testing "Invalid input should throw exception"
     (is (thrown-with-msg? IllegalArgumentException
                           #"Input must be a valid Malli schema"
-                          (schema/malli-schema->snowpark-schema {:write-key-fn (comp str/upper-case name)} {:not :a-schema})))
+                          (schema/malli-schema->snowpark-schema {} {:not :a-schema})))
 
     (is (thrown-with-msg? IllegalArgumentException
                           #"Input must be a valid Malli schema"
-                          (schema/malli-schema->snowpark-schema {:write-key-fn (comp str/upper-case name)} [:string])))))
+                          (schema/malli-schema->snowpark-schema {} [:string])))
+    
+    (is (thrown-with-msg? IllegalArgumentException
+                          #"Only map schemas are supported"
+                          (schema/malli-schema->snowpark-schema {} (m/schema :string))))))
 
 ;; Property-based test for schema inference consistency
 (defspec schema-inference-consistency-property 20

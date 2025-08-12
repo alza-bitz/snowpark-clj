@@ -26,15 +26,15 @@
    
    Args:
    - session: Snowpark session wrapper including :write-key-fn for decoding schema field names
-   - maps: Collection of maps to infer schema from
+   - data: Collection of maps representing rows to infer schema from
    
    Returns a StructType representing the schema."
-  [session maps]
-  (when (empty? maps)
+  [session data]
+  (when (empty? data)
     (throw (IllegalArgumentException. "Cannot infer schema from empty collection")))
 
-  (let [write-key-fn (session/get-write-key-fn session)
-        sample-map (first maps)
+  (let [write-key-fn (session/unwrap-write-key-fn session)
+        sample-map (first data)
         fields (for [[k v] sample-map]
                  (StructField. (write-key-fn k) (clojure-value->data-type v) true))]
     (StructType. (into-array StructField fields))))
@@ -96,7 +96,7 @@
       (throw (IllegalArgumentException. "Only map schemas are supported for conversion to Snowpark schema")))
     
     (let [field-schemas (rest parsed)
-          write-key-fn (session/get-write-key-fn session)
+          write-key-fn (session/unwrap-write-key-fn session)
           fields (for [[field-name field-type] field-schemas]
                    (let [snowpark-type (malli-type->data-type field-type)]
                      (StructField. (write-key-fn field-name) snowpark-type true)))]

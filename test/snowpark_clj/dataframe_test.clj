@@ -108,8 +108,8 @@
     {:mock-dataframe mock
      :mock-dataframe-spies (protocol/spies mock)}))
 
-(defn- mock-dataframe-wrapped
-  "Helper function that returns a minimal wrapper for tests."
+(defn- wrap-dataframe
+  "Returns a minimal wrapper for tests that don't need map access."
   [df]
   (reify
     clojure.lang.IDeref
@@ -159,7 +159,7 @@
   
   (testing "Creating DataFrame from empty data should throw exception"
     (is (thrown-with-msg? IllegalArgumentException 
-                          #"Cannot create DataFrame from empty data"
+                          #"Cannot create dataframe from empty data"
                           (df/create-dataframe {:session nil :key-fn identity} [])))))
 
 (deftest test-table
@@ -187,7 +187,7 @@
                    :read-key-fn keyword 
                    :write-key-fn (comp str/upper-case name)}
           columns [:name :salary]
-          result (df/select (mock-dataframe-wrapped test-df) columns)]
+          result (df/select (wrap-dataframe test-df) columns)]
       
       ;; Verify the result is properly wrapped
       (is (= "select" (:dataframe @result)))
@@ -195,7 +195,7 @@
       (is (= (:write-key-fn test-df) (:write-key-fn @result)))
       
       ;; Verify that the mock dataframe's select was called correctly
-      ;; The columns should be transformed to string array: ["NAME", "SALARY"]
+      ;; The columns should be decoded to string array: ["NAME", "SALARY"]
       (assert/called-once? (:select mock-dataframe-spies))
       ;; Check the actual call arguments
       (let [calls (spy/calls (:select mock-dataframe-spies))
@@ -211,7 +211,7 @@
       
       (testing "with Column object"
         (let [column-obj (Functions/col "SALARY")
-              result (df/df-filter (mock-dataframe-wrapped test-df) column-obj)]
+              result (df/df-filter (wrap-dataframe test-df) column-obj)]
           ;; The result should be a wrapped dataframe
           (is (= "filter" (:dataframe @result)))
           (is (= (:read-key-fn test-df) (:read-key-fn @result)))
@@ -221,12 +221,12 @@
           (assert/called-with? (:filter mock-dataframe-spies) mock-dataframe column-obj)))
       
       (testing "with encoded column name"
-        (let [result (df/df-filter (mock-dataframe-wrapped test-df) :salary)]
+        (let [result (df/df-filter (wrap-dataframe test-df) :salary)]
           ;; The result should be a wrapped dataframe
           (is (= "filter" (:dataframe @result)))
           (is (= (:read-key-fn test-df) (:read-key-fn @result)))
           (is (= (:write-key-fn test-df) (:write-key-fn @result)))
-          ;; Check that a Column was created using transformed name, then filter was called
+          ;; Check that a Column was created using decoded name, then filter was called
           (assert/called-once? (:col mock-dataframe-spies))
           (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "SALARY")
           (assert/called-n-times? (:filter mock-dataframe-spies) 2))))))
@@ -238,7 +238,7 @@
                    :read-key-fn keyword 
                    :write-key-fn (comp str/upper-case name)}
           limit-count 10
-          result (df/limit (mock-dataframe-wrapped test-df) limit-count)]
+          result (df/limit (wrap-dataframe test-df) limit-count)]
       
       ;; Verify the result is properly wrapped
       (is (= "limit" (:dataframe @result)))
@@ -250,7 +250,7 @@
       (assert/called-with? (:limit mock-dataframe-spies) mock-dataframe 10))))
 
 (deftest test-df-sort
-  (testing "Sort function handles single and multiple columns with column transformation"
+  (testing "Sort function handles single and multiple columns with column names decoded"
     (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
           test-df {:dataframe mock-dataframe 
                    :read-key-fn keyword 
@@ -259,13 +259,13 @@
           multi-cols [:salary :name]]
       
       ;; Test single column
-      (let [result1 (df/df-sort (mock-dataframe-wrapped test-df) single-col)]
+      (let [result1 (df/df-sort (wrap-dataframe test-df) single-col)]
         (is (= "sort" (:dataframe @result1)))
         (is (= (:read-key-fn test-df) (:read-key-fn @result1)))
         (is (= (:write-key-fn test-df) (:write-key-fn @result1))))
       
       ;; Test multiple columns
-      (let [result2 (df/df-sort (mock-dataframe-wrapped test-df) multi-cols)]
+      (let [result2 (df/df-sort (wrap-dataframe test-df) multi-cols)]
         (is (= "sort" (:dataframe @result2)))
         (is (= (:read-key-fn test-df) (:read-key-fn @result2)))
         (is (= (:write-key-fn test-df) (:write-key-fn @result2))))
@@ -273,9 +273,9 @@
       ;; Verify sort was called twice with Column arrays
       (assert/called-n-times? (:sort mock-dataframe-spies) 2)
       
-      ;; Verify that .col was called with the transformed column names
+      ;; Verify that .col was called with the decoded column names
       ;; Single column call: "SALARY"
-      ;; Multiple column calls: "SALARY", "NAME"  
+      ;; Multiple column calls: "SALARY", "NAME"
       (assert/called-n-times? (:col mock-dataframe-spies) 3)
       (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "SALARY")
       (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "NAME"))))
@@ -287,7 +287,7 @@
                    :read-key-fn keyword 
                    :write-key-fn (comp str/upper-case name)}
           columns [:department :age]
-          result (df/df-group-by (mock-dataframe-wrapped test-df) columns)]
+          result (df/df-group-by (wrap-dataframe test-df) columns)]
       
       ;; Verify the result is properly wrapped
       (is (= "groupBy" (:dataframe @result)))
@@ -295,7 +295,7 @@
       (is (= (:write-key-fn test-df) (:write-key-fn @result)))
       
       ;; Verify that the mock dataframe's groupBy was called correctly
-      ;; The columns should be transformed based on to-columns-or-names 
+      ;; The columns should be decoded based on to-columns-or-names 
       (assert/called-once? (:groupBy mock-dataframe-spies))
       ;; Check the actual call arguments  
       (let [calls (spy/calls (:groupBy mock-dataframe-spies))
@@ -319,13 +319,13 @@
           join-expr "left.id = right.id"]
       
       ;; Test default join type (2-arity)
-      (let [result1 (df/join (mock-dataframe-wrapped test-df) (mock-dataframe-wrapped other-df) join-expr)]
+      (let [result1 (df/join (wrap-dataframe test-df) (wrap-dataframe other-df) join-expr)]
         (is (= "join" (:dataframe @result1)))
         (is (= (:read-key-fn test-df) (:read-key-fn @result1)))
         (is (= (:write-key-fn test-df) (:write-key-fn @result1))))
       
       ;; Test explicit join type (3-arity)
-      (let [result2 (df/join (mock-dataframe-wrapped test-df) (mock-dataframe-wrapped other-df) join-expr :left)]
+      (let [result2 (df/join (wrap-dataframe test-df) (wrap-dataframe other-df) join-expr :left)]
         (is (= "join" (:dataframe @result2)))
         (is (= (:read-key-fn test-df) (:read-key-fn @result2)))
         (is (= (:write-key-fn test-df) (:write-key-fn @result2))))
@@ -345,7 +345,7 @@
           expected-result [{:id 1 :name "Alice"}]]
       
       (with-redefs [convert/rows->maps (spy/stub expected-result)]
-        (let [result (df/collect (mock-dataframe-wrapped test-df))]
+        (let [result (df/collect (wrap-dataframe test-df))]
           ;; Verify the result is the data returned by mock collect
           (is (= expected-result result))
 
@@ -364,10 +364,10 @@
                    :write-key-fn (comp str/upper-case name)}]
       
       ;; Test with default row count (1-arity)
-      (df/show (mock-dataframe-wrapped test-df))
+      (df/show (wrap-dataframe test-df))
       
       ;; Test with explicit row count (2-arity)
-      (df/show (mock-dataframe-wrapped test-df) 5)
+      (df/show (wrap-dataframe test-df) 5)
       
       ;; Verify that the mock dataframe's show was called correctly
       (assert/called-n-times? (:show mock-dataframe-spies) 2)
@@ -380,7 +380,7 @@
           test-df {:dataframe mock-dataframe
                    :read-key-fn keyword 
                    :write-key-fn (comp str/upper-case name)}
-          result (df/df-count (mock-dataframe-wrapped test-df))]
+          result (df/df-count (wrap-dataframe test-df))]
       
       ;; Verify the result is the count returned by mock
       (is (= "mock-count" result))
@@ -397,7 +397,7 @@
           expected-result [{:id 1 :name "Alice"}]]
       
       (with-redefs [convert/rows->maps (spy/stub expected-result)]
-        (let [result (df/df-take (mock-dataframe-wrapped test-df) 1)]
+        (let [result (df/df-take (wrap-dataframe test-df) 1)]
 
           ;; df-take uses limit + collect internally, so we verify the result
           (is (= expected-result result))
@@ -420,7 +420,7 @@
               test-df {:dataframe mock-dataframe
                        :read-key-fn keyword 
                        :write-key-fn (comp str/upper-case name)}
-              result (df/save-as-table (mock-dataframe-wrapped test-df) table-name)]
+              result (df/save-as-table (wrap-dataframe test-df) table-name)]
           (is (= "saveAsTable" result))
           (assert/called-once? (:write mock-dataframe-spies))
           (assert/called-once? (:saveAsTable mock-writer-spies))))
@@ -432,7 +432,7 @@
               test-df {:dataframe mock-dataframe
                        :read-key-fn keyword 
                        :write-key-fn (comp str/upper-case name)}
-              result (df/save-as-table (mock-dataframe-wrapped test-df) table-name :overwrite)]
+              result (df/save-as-table (wrap-dataframe test-df) table-name :overwrite)]
           (is (= "saveAsTable" result))
           (assert/called-once? (:write mock-dataframe-spies))
           (assert/called-once? (:mode mock-writer-spies))
@@ -446,7 +446,7 @@
               test-df {:dataframe mock-dataframe
                        :read-key-fn keyword 
                        :write-key-fn (comp str/upper-case name)}
-              result (df/save-as-table (mock-dataframe-wrapped test-df) table-name :overwrite {:cluster-by ["col1"]})]
+              result (df/save-as-table (wrap-dataframe test-df) table-name :overwrite {:cluster-by ["col1"]})]
           (is (= "saveAsTable" result))
           (assert/called-once? (:write mock-dataframe-spies))
           (assert/called-once? (:mode mock-writer-spies))
@@ -459,7 +459,7 @@
           test-df {:dataframe mock-dataframe
                    :read-key-fn keyword 
                    :write-key-fn (comp str/upper-case name)}
-          result (df/schema (mock-dataframe-wrapped test-df))]
+          result (df/schema (wrap-dataframe test-df))]
       
       ;; Verify the result is the schema returned by mock
       (is (= "mock-schema" result))
@@ -469,37 +469,37 @@
       (assert/called-with? (:schema mock-dataframe-spies) mock-dataframe))))
 
 (deftest test-col
-  (testing "Col function returns Column object with transformed name"
+  (testing "Col function returns Column object with decoded name"
     (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
           test-df {:dataframe mock-dataframe :write-key-fn (comp str/upper-case name)}]
       
       ;; Test with keyword column name
-      (let [result (df/col (mock-dataframe-wrapped test-df) :name)]
+      (let [result (df/col (wrap-dataframe test-df) :name)]
         (is (some? result))
-        ;; Verify the transformation was applied before calling .col
+        ;; Verify the column name decoding was applied before calling .col
         (assert/called-once? (:col mock-dataframe-spies))
         (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "NAME"))
       
       ;; Test with string column name
-      (let [result (df/col (mock-dataframe-wrapped test-df) "department")]
+      (let [result (df/col (wrap-dataframe test-df) "department")]
         (is (some? result))
         (assert/called-n-times? (:col mock-dataframe-spies) 2)
         (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "DEPARTMENT"))))
   
-  (testing "Col function works with different write-key-fn transformations"
+  (testing "Col function works with different write-key-fn decodings"
 
-    (testing "Lowercase transformation"
+    (testing "Lowercase decoding"
       (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
             lowercase-df {:dataframe mock-dataframe :write-key-fn (comp str/lower-case name)}
-            result (df/col (mock-dataframe-wrapped lowercase-df) :COLUMN_NAME)]
+            result (df/col (wrap-dataframe lowercase-df) :COLUMN_NAME)]
         (is (some? result))
         (assert/called-once? (:col mock-dataframe-spies))
         (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "column_name")))
     
-    (testing "String transformation (no case change)"
+    (testing "String decoding (no case change)"
       (let [{:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe)
             identity-df {:dataframe mock-dataframe :write-key-fn str}
-            result (df/col (mock-dataframe-wrapped identity-df) :column-name)]
+            result (df/col (wrap-dataframe identity-df) :column-name)]
         (is (some? result))
         (assert/called-once? (:col mock-dataframe-spies))
                 (assert/called-with? (:col mock-dataframe-spies) mock-dataframe ":column-name")))))
@@ -508,13 +508,13 @@
   (testing "DataFrame wrapper supports map-like column access (feature 5)"
     (let [{:keys [mock-schema]} (mock-schema #{"NAME" "SALARY" "AGE" "DEPARTMENT" "ID"})
           {:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe {:mock-schema mock-schema})
-          test-df (df/wrap-dataframe mock-dataframe {:write-key-fn (comp str/upper-case name)
+          test-df (#'df/wrap-dataframe mock-dataframe {:write-key-fn (comp str/upper-case name)
                                                      :read-key-fn (comp keyword str/lower-case)})]
 
       (testing "IFn access: (df :column)"
         (let [result (test-df :name)]
           (is (some? result))
-          ;; Verify the transformation was applied before calling .col
+          ;; Verify the column name decoding was applied before calling .col
           (assert/called-once? (:col mock-dataframe-spies))
           (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "NAME")))
 
@@ -534,10 +534,10 @@
         (let [field-count (clojure.core/count test-df)]
           (is (= 5 field-count))))
 
-      (testing "Iterable/Seqable access: (keys df) returns seq of (transformed) field names"
+      (testing "Iterable/Seqable access: (keys df) returns seq of encoded field names"
         (let [df-keys (keys test-df)]
           (is (= 5 (clojure.core/count df-keys)))
-          ;; Keys should be transformed using read-key-fn (keyword + lowercase)
+          ;; Keys should be encoded using read-key-fn (keyword + lowercase)
           (is (= #{:name :salary :age :department :id} (set df-keys)))))
 
       (testing "Iterable/Seqable access: (vals df) returns seq of column objects"
@@ -546,7 +546,7 @@
           ;; Each value should be a Column object
           (is (every? #(instance? com.snowflake.snowpark_java.Column %) df-vals))))
 
-      (testing "Iterable/Seqable access: (seq df) returns seq of MapEntry, each with the (transformed) field name and column object"
+      (testing "Iterable/Seqable access: (seq df) returns seq of MapEntry, each with the encoded field name and column object"
         (let [df-seq (seq test-df)]
           (is (= 5 (clojure.core/count df-seq)))
           ;; Each item should be a MapEntry object

@@ -193,19 +193,6 @@
           (is (boolean? (:active row)))
           (is (number? (:score row))))))))
 
-;; Error Handling Tests
-(deftest test-error-handling
-  (testing "Error handling works correctly"
-    ;; Test empty data
-    (is (thrown-with-msg? IllegalArgumentException 
-                          #"Cannot create DataFrame from empty data"
-                          (sp/create-dataframe *session* [])))
-    
-    ;; Test invalid schema conversion
-    (is (thrown-with-msg? IllegalArgumentException
-                          #"Only map schemas are supported"
-                          (sp/malli-schema->snowpark-schema *session* (m/schema :string))))))
-
 ;; Session Management Tests
 (deftest test-session-management
   (testing "Session management works correctly"
@@ -220,8 +207,8 @@
       (is (fn? (:write-key-fn session))) ; Test it's a function rather than specific function
       
       ;; Test session options
-      (is (fn? (session/get-read-key-fn session)))  ; Test it's a function rather than specific function
-      (is (fn? (session/get-write-key-fn session))) ; Test it's a function rather than specific function
+      (is (fn? (session/unwrap-read-key-fn session)))  ; Test it's a function rather than specific function
+      (is (fn? (session/unwrap-write-key-fn session))) ; Test it's a function rather than specific function
       
       ;; Clean up
       (sp/close-session session))
