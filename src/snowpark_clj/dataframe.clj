@@ -5,27 +5,16 @@
    [snowpark-clj.schema :as schema]
    [snowpark-clj.session :as session]))
 
-;; Helper functions for dataframe wrappers
-
-(defn- unwrap-dataframe
-  "Extract the Snowpark DataFrame from a dataframe wrapper"
-  [df-wrapper]
-  (:dataframe @df-wrapper))
-
-(defn- unwrap-option
-  "Get an option from a dataframe wrapper"
-  [df-wrapper option-key]
-  (get @df-wrapper option-key))
-
-(defn- unwrap-options
-  "Get all options from a dataframe wrapper"
-  [df-wrapper]
-  (dissoc @df-wrapper :dataframe))
+(defprotocol IWrappedDataFrame
+  "Protocol for accessing the Snowpark DataFrame and session options of a wrapped dataframe"
+  (unwrap-dataframe [this] "Get the Snowpark DataFrame from a dataframe wrapper")
+  (unwrap-option [this option-key] "Get an option from a dataframe wrapper") 
+  (unwrap-options [this] "Get all options from a dataframe wrapper"))
 
 (defn- wrap-dataframe
   "Wrap a Snowpark DataFrame with session options and map-like column access"
-  [dataframe opts]
-  (let [base-map (merge {:dataframe dataframe} opts)]
+  [df opts]
+  (let [base-map (merge {:dataframe df} opts)]
     
     ;; Return a map that implements IFn and ILookup for map-like column access
     (reify
@@ -111,10 +100,11 @@
       (toString [_]
         (.toString base-map))
       
-      ;; Support accessing the underlying map data
-      clojure.lang.IDeref
-      (deref [_]
-        base-map))))
+      ;; Implement the protocol for accessing wrapped dataframe
+      IWrappedDataFrame
+      (unwrap-dataframe [_] (:dataframe base-map))
+      (unwrap-option [_ option-key] (get base-map option-key))
+      (unwrap-options [_] (dissoc base-map :dataframe)))))
 
 ;; Helper functions for consistent column argument handling
 
