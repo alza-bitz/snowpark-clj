@@ -3,7 +3,8 @@
         com.snowflake/snowpark {:mvn/version "1.14.0"}
         org.scicloj/noj {:mvn/version "2-beta18"}
         metosin/malli {:mvn/version "0.16.4"}
-        potemkin/potemkin {:mvn/version "0.4.6"}}
+        potemkin/potemkin {:mvn/version "0.4.6"}
+        aero/aero {:mvn/version "1.1.6"}}
  :aliases
  {:dev {:extra-paths ["dev" "test" "integration"]
         :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}

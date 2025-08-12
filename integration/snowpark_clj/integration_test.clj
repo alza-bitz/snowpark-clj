@@ -31,7 +31,7 @@
 (defn session-fixture
   "Create a session for testing and clean up afterwards"
   [f]
-  (let [session (sp/create-session "snowflake.properties")]
+  (let [session (sp/create-session "snowflake.edn")]
     (binding [*session* session]
       (try
         ;; Clean up any existing test table before running test
@@ -133,7 +133,7 @@
 (deftest test-feature-3-session-macros
   (testing "Feature 3: Session macros work correctly"
     ;; Test with-session macro
-    (let [result (sp/with-session [session (sp/create-session "snowflake.properties")]
+    (let [result (sp/with-session [session (sp/create-session "snowflake.edn")]
                    (let [df (sp/create-dataframe session test-data)]
                      (sp/count df)))]
       (is (= 3 result)))))
@@ -198,7 +198,7 @@
 (deftest test-session-management
   (testing "Session management works correctly"
     ;; Test session creation with properties file
-    (let [session (sp/create-session "snowflake.properties")]
+    (let [session (sp/create-session "snowflake.edn")]
       (is (some? session))
       (is (map? session))
       (is (:session session))
@@ -215,7 +215,7 @@
       (sp/close-session session))
     
     ;; Test session creation with custom options
-    (let [session (sp/create-session "snowflake.properties" 
+    (let [session (sp/create-session "snowflake.edn" 
                                           {:read-key-fn identity 
                                            :write-key-fn str/upper-case})]
       (is (some? session))
