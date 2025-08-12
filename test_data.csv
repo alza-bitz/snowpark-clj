@@ -1,5 +1,5 @@
-ID,NAME,DEPARTMENT,SALARY
-1,Alice,Engineering,75000
-2,Bob,Marketing,65000
-3,Charlie,Engineering,80000
-4,Diana,Sales,70000
+ID,NAME,AGE,DEPARTMENT,SALARY
+1,Alice,25,Engineering,75000
+2,Bob,30,Marketing,65000
+3,Charlie,35,Engineering,80000
+4,Diana,40,Sales,70000

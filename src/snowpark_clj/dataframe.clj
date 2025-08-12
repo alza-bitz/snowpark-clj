@@ -10,13 +10,107 @@
 (defn unwrap-dataframe
   "Extract the raw Snowpark DataFrame from a wrapped DataFrame"
   [df-wrapper]
-  (:dataframe df-wrapper))
+  (:dataframe @df-wrapper))
+
+(defn- get-dataframe-option
+  "Get an option from a wrapped DataFrame"
+  [df-wrapper option-key]
+  (get @df-wrapper option-key))
 
 (defn wrap-dataframe
-  "Wrap a raw Snowpark DataFrame with session options"
+  "Wrap a raw Snowpark DataFrame with session options and map-like column access"
   [dataframe session-or-df-wrapper]
-  (let [opts (select-keys session-or-df-wrapper [:read-key-fn :write-key-fn])]
-    (merge {:dataframe dataframe} opts)))
+  (let [opts (select-keys session-or-df-wrapper [:read-key-fn :write-key-fn])
+        base-map (merge {:dataframe dataframe} opts)]
+    
+    ;; Return a map that implements IFn and ILookup for map-like column access
+    (reify
+      clojure.lang.ILookup
+      (valAt [this k]
+        (.valAt this k nil))
+      (valAt [_ k not-found]
+        (let [write-key-fn (:write-key-fn base-map)
+              transformed-name (write-key-fn k)
+              raw-df (:dataframe base-map)
+              schema (.schema raw-df)
+              field-names (set (.names schema))]
+          (if (contains? field-names transformed-name)
+            (.col raw-df transformed-name)
+            not-found)))
+      
+      clojure.lang.IFn
+      (invoke [this k]
+        (.valAt this k))
+      (invoke [this k not-found]
+        (.valAt this k not-found))
+      
+      clojure.lang.IPersistentMap
+      (assoc [_ _ _]
+        (throw (UnsupportedOperationException. "Cannot assoc on DataFrame wrapper")))
+      (without [_ _]
+        (throw (UnsupportedOperationException. "Cannot dissoc on DataFrame wrapper")))
+      (iterator [this]
+        ;; Support keys and vals operations
+        (.iterator (.seq this)))
+      
+      clojure.lang.Associative
+      (containsKey [_ k]
+        (let [write-key-fn (:write-key-fn base-map)
+              transformed-name (write-key-fn k)
+              raw-df (:dataframe base-map)
+              schema (.schema raw-df)
+              field-names (set (.names schema))]
+          (contains? field-names transformed-name)))
+      (entryAt [this k]
+        (when (.containsKey this k)
+          (clojure.lang.MapEntry. k (.valAt this k))))
+      
+      clojure.lang.IPersistentCollection
+      (count [_]
+        ;; Return the number of fields in the DataFrame schema
+        (let [raw-df (:dataframe base-map)
+              schema (.schema raw-df)
+              field-names (.names schema)]
+          (alength field-names)))
+      (empty [_]
+        {})
+      (equiv [_ o]
+        (and (map? o) (= base-map o)))
+      
+      clojure.lang.Seqable
+      (seq [_]
+        ;; Return a seq of MapEntry objects, each containing the transformed field name and column object
+        (let [raw-df (:dataframe base-map)
+              schema (.schema raw-df)
+              field-names (.names schema)
+              read-key-fn (:read-key-fn base-map)]
+          (map (fn [field-name]
+                 (let [transformed-key (read-key-fn field-name)
+                       column-obj (.col raw-df field-name)]
+                   (clojure.lang.MapEntry. transformed-key column-obj)))
+               field-names)))
+      
+      ;; Additional map-like operations for DataFrame columns
+      clojure.lang.IKVReduce
+      (kvreduce [this f init]
+        (reduce (fn [acc [k v]] (f acc k v)) init (.seq this)))
+      
+      clojure.lang.IHashEq
+      (hasheq [_]
+        (.hasheq base-map))
+      
+      Object
+      (hashCode [_]
+        (.hashCode base-map))
+      (equals [this o]
+        (.equiv this o))
+      (toString [_]
+        (.toString base-map))
+      
+      ;; Support accessing the underlying map data
+      clojure.lang.IDeref
+      (deref [_]
+        base-map))))
 
 ;; Helper functions for consistent column argument handling
 
@@ -124,10 +218,10 @@
    Returns: Wrapped DataFrame"
   [df cols]
   (let [raw-df (unwrap-dataframe df)
-        write-key-fn (:write-key-fn df)
+        write-key-fn (get-dataframe-option df :write-key-fn)
         col-array (to-columns-or-names cols write-key-fn)
         result-df (.select raw-df col-array)]
-    (wrap-dataframe result-df df)))
+    (wrap-dataframe result-df @df)))
 
 (defn df-filter
   "Filter rows in a DataFrame using a condition.
@@ -139,12 +233,12 @@
    Returns: Wrapped DataFrame"
   [df condition]
   (let [raw-df (unwrap-dataframe df)
-        write-key-fn (:write-key-fn df)
+        write-key-fn (get-dataframe-option df :write-key-fn)
         col-condition (if (instance? com.snowflake.snowpark_java.Column condition)
                         condition
                         (.col raw-df (write-key-fn condition)))
         result-df (.filter raw-df col-condition)]
-    (wrap-dataframe result-df df)))
+    (wrap-dataframe result-df @df)))
 
 (defn where
   "Alias for df-filter"
@@ -162,7 +256,7 @@
   [df n]
   (let [raw-df (unwrap-dataframe df)
         result-df (.limit raw-df n)]
-    (wrap-dataframe result-df df)))
+    (wrap-dataframe result-df @df)))
 
 (defn df-sort
   "Sort DataFrame by columns.
@@ -174,10 +268,10 @@
    Returns: Wrapped DataFrame"
   [df cols]
   (let [raw-df (unwrap-dataframe df)
-        write-key-fn (:write-key-fn df)
+        write-key-fn (get-dataframe-option df :write-key-fn)
         col-array (to-columns cols write-key-fn raw-df)
         result-df (.sort raw-df col-array)]
-    (wrap-dataframe result-df df)))
+    (wrap-dataframe result-df @df)))
 
 (defn df-group-by
   "Group DataFrame by columns.
@@ -189,10 +283,10 @@
    Returns: Wrapped GroupedDataFrame"
   [df cols]
   (let [raw-df (unwrap-dataframe df)
-        write-key-fn (:write-key-fn df)
+        write-key-fn (get-dataframe-option df :write-key-fn)
         col-array (to-columns-or-names cols write-key-fn)
         result-grouped-df (.groupBy raw-df col-array)]
-    (wrap-dataframe result-grouped-df df)))
+    (wrap-dataframe result-grouped-df @df)))
 
 (defn join
   "Join two DataFrames.
@@ -217,7 +311,7 @@
                          :full "outer"
                          (name join-type))
          result (.join left-raw right-raw join-exprs join-type-str)]
-     (wrap-dataframe result left))))
+     (wrap-dataframe result @left))))
 
 ;; DataFrame action functions (eager)
 
@@ -230,7 +324,7 @@
    Returns: Vector of maps with keys encoded using read-key-fn"
   [df]
   (let [raw-df (unwrap-dataframe df)
-        read-key-fn (:read-key-fn df)
+        read-key-fn (get-dataframe-option df :read-key-fn)
         collected-rows (.collect raw-df)
         schema (.schema raw-df)]
     (convert/rows->maps collected-rows schema read-key-fn)))
@@ -320,7 +414,7 @@
    Returns: Snowpark Column object"
   [df col-name]
   (let [raw-df (unwrap-dataframe df)
-        write-key-fn (:write-key-fn df)
+        write-key-fn (get-dataframe-option df :write-key-fn)
         transformed-name (write-key-fn col-name)]
     (.col raw-df transformed-name)))
 

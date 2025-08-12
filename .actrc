@@ -1,0 +1,5 @@
+--pull=false
+--artifact-server-path /tmp/act
+--env-file ./.actenv
+--defaultbranch main
+# --no-skip-checkout

@@ -1,0 +1,20 @@
+name: 'clojure-setup'
+description: 'Composite action to setup Java and Clojure CLI'
+inputs:
+  java-version:
+    description: 'Java version to use. Defaults to version 17' 
+    # default: '17' # see https://github.com/actions/runner/issues/924
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/cache@v3
+      with:
+        key: clojure-deps-${{ hashFiles('deps.edn') }}
+        path: ~/.m2/repository
+    - uses: actions/setup-java@v4
+      with:
+        java-version: ${{ inputs.java-version || '17' }} # see https://github.com/actions/runner/issues/924
+        distribution: temurin
+    - uses: DeLaGuardo/setup-clojure@13.2
+      with: 
+        cli: latest

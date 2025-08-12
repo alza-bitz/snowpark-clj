@@ -5,9 +5,7 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [malli.core :as m]
    [malli.generator :as mg]
-   [snowpark-clj.dataframe :as df]
-   [snowpark-clj.functions :as fn]
-   [snowpark-clj.schema :as schema]
+   [snowpark-clj.core :as sp]
    [snowpark-clj.session :as session]))
 
 ;; Test data and schema
@@ -32,23 +30,23 @@
 (defn session-fixture
   "Create a session for testing and clean up afterwards"
   [f]
-  (let [session (session/create-session "snowflake.properties")]
+  (let [session (sp/create-session "snowflake.properties")]
     (binding [*session* session]
       (try
         ;; Clean up any existing test table before running test
         (try
-          (df/sql session (str "DROP TABLE IF EXISTS " test-table-name))
+          (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
           (catch Exception e
             (println "Warning: Could not drop table:" (.getMessage e))))
         (f)
         (finally
           ;; Clean up: drop test table and close session
           (try
-            (df/sql session (str "DROP TABLE IF EXISTS " test-table-name))
+            (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
             (catch Exception e
               (println "Warning: Could not drop table during cleanup:" (.getMessage e))))
           (try
-            (session/close-session session)
+            (sp/close-session session)
             (catch Exception e
               (println "Warning: Could not close session:" (.getMessage e)))))))))
 
@@ -58,30 +56,30 @@
 (deftest test-feature-1-create-and-save-dataframe
   (testing "Feature 1: Load Clojure data and save to Snowflake table"
     ;; Create DataFrame from Clojure data
-    (let [dataframe (df/create-dataframe *session* test-data)]
+    (let [dataframe (sp/create-dataframe *session* test-data)]
       
       ;; Verify DataFrame was created successfully
       (is (some? dataframe))
       (is (map? dataframe))
-      (is (:dataframe dataframe))
-      (is (:read-key-fn dataframe))
-      (is (:write-key-fn dataframe))
+      (is (:dataframe @dataframe))
+      (is (:read-key-fn @dataframe))
+      (is (:write-key-fn @dataframe))
       
       ;; Check schema
-      (let [schema (df/schema dataframe)]
+      (let [schema (sp/schema dataframe)]
         (is (some? schema)))
       
       ;; Check columns
-      (let [columns (.names (df/schema dataframe))]
+      (let [columns (.names (sp/schema dataframe))]
         (is (= 5 (count columns)))
         (is (every? #{"ID" "NAME" "AGE" "DEPARTMENT" "SALARY"} columns)))
       
       ;; Save to Snowflake table
-      (df/save-as-table dataframe test-table-name :overwrite)
+      (sp/save-as-table dataframe test-table-name :overwrite)
       
       ;; Verify table was created by reading it back
-      (let [table-df (df/table *session* test-table-name)
-            results (df/collect table-df)]
+      (let [table-df (sp/table *session* test-table-name)
+            results (sp/collect table-df)]
         (is (= 3 (count results)))
         (is (every? map? results))
         
@@ -97,18 +95,18 @@
 (deftest test-feature-2-read-and-compute
   (testing "Feature 2: Read from table, compute, and collect results"
     ;; First create and save test data (Feature 1)
-    (let [dataframe (df/create-dataframe *session* test-data)]
-      (df/save-as-table dataframe test-table-name :overwrite)
+    (let [dataframe (sp/create-dataframe *session* test-data)]
+      (sp/save-as-table dataframe test-table-name :overwrite)
       
       ;; Read from table and apply transformations
-      (let [table-df (df/table *session* test-table-name)
-            salary-col (df/col table-df :salary)
-            salary-condition (fn/gt salary-col (fn/lit 65000))
-            filtered-df (df/df-filter table-df salary-condition)
-            selected-df (df/select filtered-df [:name :salary])
-            sorted-df (df/df-sort selected-df [:salary])
-            limited-df (df/limit sorted-df 2)
-            results (df/collect limited-df)]
+      (let [table-df (sp/table *session* test-table-name)
+            salary-col (sp/col table-df :salary)
+            salary-condition (sp/gt salary-col (sp/lit 65000))
+            filtered-df (sp/filter table-df salary-condition)
+            selected-df (sp/select filtered-df [:name :salary])
+            sorted-df (sp/sort selected-df [:salary])
+            limited-df (sp/limit sorted-df 2)
+            results (sp/collect limited-df)]
         
         (is (vector? results))
         (is (<= (count results) 2))
@@ -121,12 +119,12 @@
             (is (contains? first-row :salary)))))
       
       ;; Test other action operations
-      (let [table-df (df/table *session* test-table-name)
-            row-count (df/df-count table-df)]
+      (let [table-df (sp/table *session* test-table-name)
+            row-count (sp/count table-df)]
         (is (= 3 row-count)))
        
-      (let [table-df (df/table *session* test-table-name)
-            sample-rows (df/df-take table-df 2)]
+      (let [table-df (sp/table *session* test-table-name)
+            sample-rows (sp/take table-df 2)]
         (is (= 2 (count sample-rows)))
         (is (every? map? sample-rows))))))
 
@@ -134,37 +132,37 @@
 (deftest test-feature-3-session-macros
   (testing "Feature 3: Session macros work correctly"
     ;; Test with-session macro
-    (let [result (session/with-session [s (session/create-session "snowflake.properties")]
-                   (let [df (df/create-dataframe s test-data)]
-                     (df/df-count df)))]
+    (let [result (sp/with-session [session (sp/create-session "snowflake.properties")]
+                   (let [df (sp/create-dataframe session test-data)]
+                     (sp/count df)))]
       (is (= 3 result)))))
 
 ;; Feature 4 Integration Tests (Malli Schema Conversion)
 (deftest test-feature-4-malli-schema-conversion
   (testing "Feature 4: Malli schema to Snowpark schema conversion"
     ;; Convert Malli schema to Snowpark schema
-    (let [snowpark-schema (schema/malli-schema->snowpark-schema *session* test-employee-schema)]
+    (let [snowpark-schema (sp/malli-schema->snowpark-schema *session* test-employee-schema)]
       (is (some? snowpark-schema))
 
       ;; Create DataFrame with explicit schema
-      (let [dataframe (df/create-dataframe *session* test-data snowpark-schema)]
+      (let [dataframe (sp/create-dataframe *session* test-data snowpark-schema)]
         (is (some? dataframe))
         (is (map? dataframe))
 
         ;; Verify schema matches
-        (let [columns (.names (df/schema dataframe))]
+        (let [columns (.names (sp/schema dataframe))]
           (is (= 5 (count columns)))
           (is (every? #{"ID" "NAME" "AGE" "DEPARTMENT" "SALARY"} columns)))))
 
     ;; Test with generated data
     (let [generated-data (mg/generate [:vector {:gen/min 5 :gen/max 5} test-employee-schema])
-          snowpark-schema (schema/malli-schema->snowpark-schema *session* test-employee-schema)
-          dataframe (df/create-dataframe *session* generated-data snowpark-schema)]
+          snowpark-schema (sp/malli-schema->snowpark-schema *session* test-employee-schema)
+          dataframe (sp/create-dataframe *session* generated-data snowpark-schema)]
 
-      (is (= 5 (df/df-count dataframe)))
+      (is (= 5 (sp/count dataframe)))
 
       ;; Round-trip test: create, collect, and verify data integrity
-      (let [collected-data (df/collect dataframe)]
+      (let [collected-data (sp/collect dataframe)]
         (is (= 5 (count collected-data)))
         (is (every? map? collected-data))
 
@@ -184,10 +182,10 @@
                        :active true 
                        :score 95.5 
                        :created_at (java.sql.Timestamp. (System/currentTimeMillis))}]
-          dataframe (df/create-dataframe *session* mixed-data)]
+          dataframe (sp/create-dataframe *session* mixed-data)]
       
       (is (some? dataframe))
-      (let [collected (df/collect dataframe)]
+      (let [collected (sp/collect dataframe)]
         (is (= 1 (count collected)))
         (let [row (first collected)]
           (is (integer? (:id row)))
@@ -201,18 +199,18 @@
     ;; Test empty data
     (is (thrown-with-msg? IllegalArgumentException 
                           #"Cannot create DataFrame from empty data"
-                          (df/create-dataframe *session* [])))
+                          (sp/create-dataframe *session* [])))
     
     ;; Test invalid schema conversion
     (is (thrown-with-msg? IllegalArgumentException
                           #"Only map schemas are supported"
-                          (schema/malli-schema->snowpark-schema *session* (m/schema :string))))))
+                          (sp/malli-schema->snowpark-schema *session* (m/schema :string))))))
 
 ;; Session Management Tests
 (deftest test-session-management
   (testing "Session management works correctly"
     ;; Test session creation with properties file
-    (let [session (session/create-session "snowflake.properties")]
+    (let [session (sp/create-session "snowflake.properties")]
       (is (some? session))
       (is (map? session))
       (is (:session session))
@@ -226,10 +224,10 @@
       (is (fn? (session/get-write-key-fn session))) ; Test it's a function rather than specific function
       
       ;; Clean up
-      (session/close-session session))
+      (sp/close-session session))
     
     ;; Test session creation with custom options
-    (let [session (session/create-session "snowflake.properties" 
+    (let [session (sp/create-session "snowflake.properties" 
                                           {:read-key-fn identity 
                                            :write-key-fn str/upper-case})]
       (is (some? session))
@@ -237,7 +235,88 @@
       (is (= str/upper-case (:write-key-fn session)))
       
       ;; Clean up
-      (session/close-session session))))
+      (sp/close-session session))))
+
+;; Feature 5 Integration Tests (Map-like Column Access)
+(deftest test-feature-5-map-like-column-access
+  (testing "Feature 5: Map-like access to columns"
+    ;; First create and save test data
+    (let [dataframe (sp/create-dataframe *session* test-data)]
+      (sp/save-as-table dataframe test-table-name :overwrite)
+      
+      ;; Read the table back to get a fresh dataframe for testing
+      (let [table-df (sp/table *session* test-table-name)]
+        
+        (testing "IFn access: (df :column)"
+          ;; Test accessing columns using dataframe as a function
+          (let [name-col (table-df :name)
+                salary-col (table-df :salary)
+                age-col (table-df :age)]
+            ;; Verify we get Column objects back
+            (is (instance? com.snowflake.snowpark_java.Column name-col))
+            (is (instance? com.snowflake.snowpark_java.Column salary-col))
+            (is (instance? com.snowflake.snowpark_java.Column age-col))
+            
+            ;; Test that we can use these columns in queries
+            (let [filtered-df (sp/filter table-df (sp/gt salary-col (sp/lit 65000)))
+                  results (sp/collect filtered-df)]
+              (is (= 2 (count results)))  ; Alice and Bob have salary > 65000
+              (is (every? #(> (:salary %) 65000) results)))))
+        
+        (testing "ILookup access: (:column df)"
+          ;; Test accessing columns using keyword lookup
+          (let [name-col (:name table-df)
+                department-col (:department table-df)
+                id-col (:id table-df)]
+            ;; Verify we get Column objects back
+            (is (instance? com.snowflake.snowpark_java.Column name-col))
+            (is (instance? com.snowflake.snowpark_java.Column department-col))
+            (is (instance? com.snowflake.snowpark_java.Column id-col))
+            
+            ;; Test that we can use these columns in queries
+            (let [selected-df (sp/select table-df [name-col department-col])
+                  results (sp/collect selected-df)]
+              (is (= 3 (count results)))
+              (is (every? #(contains? % :name) results))
+              (is (every? #(contains? % :department) results))
+              (is (not-any? #(contains? % :salary) results)))))  ; salary should not be in results
+        
+        (testing "Non-existent column returns nil"
+          ;; Test both access patterns return nil for non-existent columns
+          (is (nil? (table-df :non-existent-column)))
+          (is (nil? (:also-non-existent table-df)))
+          (is (nil? (table-df :invalid-field)))
+          (is (nil? (:missing-column table-df))))
+        
+        (testing "Mixed column access patterns work together"
+          ;; Test combining both access patterns in the same query
+          (let [name-col (table-df :name)        ; IFn access
+                salary-col (:salary table-df)    ; ILookup access
+                condition (sp/eq salary-col (sp/lit 70000))  ; Equal to 70000, not greater than
+                selected-df (sp/select table-df [name-col salary-col])
+                filtered-df (sp/filter selected-df condition)
+                results (sp/collect filtered-df)]
+            (is (= 1 (count results)))  ; Only Alice has salary = 70000
+            (let [alice (first results)]
+              (is (= "Alice" (:name alice)))
+              (is (= 70000 (:salary alice))))))
+        
+        (testing "Column access with case transformation"
+          ;; Test that column names are properly transformed (lowercase keywords to uppercase strings)
+          (let [mixed-case-col (table-df :DePaRtMeNt)  ; Should work regardless of case in keyword
+                upper-col (:SALARY table-df)
+                lower-col (:name table-df)]
+            ;; All should return Column objects since the dataframe uses case-insensitive transforms
+            (is (instance? com.snowflake.snowpark_java.Column mixed-case-col))
+            (is (instance? com.snowflake.snowpark_java.Column upper-col))
+            (is (instance? com.snowflake.snowpark_java.Column lower-col))
+            
+            ;; Test in a real query
+            (let [selected-df (sp/select table-df [lower-col upper-col])
+                  results (sp/collect selected-df)]
+              (is (= 3 (count results)))
+              (is (every? #(contains? % :name) results))
+              (is (every? #(contains? % :salary) results)))))))))
 
 ;; Performance and Scalability Tests
 (deftest test-performance-scalability
@@ -246,15 +325,15 @@
                                       #(hash-map :id (rand-int 10000)
                                                  :name (str "User" (rand-int 1000))
                                                  :score (rand-int 100))))
-          dataframe (df/create-dataframe *session* large-data)]
+          dataframe (sp/create-dataframe *session* large-data)]
       
       (is (some? dataframe))
-      (is (= 1000 (df/df-count dataframe)))
+      (is (= 1000 (sp/count dataframe)))
       
       ;; Test filtering and aggregation on larger dataset
-      (let [score-col (df/col dataframe :score)
-            score-condition (fn/gt score-col (fn/lit 50))
-            filtered-df (df/df-filter dataframe score-condition)
-            sample-data (df/df-take filtered-df 10)]
+      (let [score-col (sp/col dataframe :score)
+            score-condition (sp/gt score-col (sp/lit 50))
+            filtered-df (sp/filter dataframe score-condition)
+            sample-data (sp/take filtered-df 10)]
         (is (<= (count sample-data) 10))
         (is (every? #(> (:score %) 50) sample-data))))))

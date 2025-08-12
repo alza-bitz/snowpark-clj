@@ -2,10 +2,11 @@
   "Main API for Snowpark Clojure wrapper"
   (:require [potemkin :refer [import-vars]] 
             [snowpark-clj.dataframe :as df]
-            [snowpark-clj.functions]
+            [snowpark-clj.functions :as fn]
             [snowpark-clj.schema]
             [snowpark-clj.session])
-  (:refer-clojure :exclude [filter sort group-by count take]))
+  (:refer-clojure :exclude [filter sort group-by count take
+                            and or not abs max min]))
 
 ;; Re-export functions from other layers with preserved docstrings and arglists
 (import-vars
@@ -28,6 +29,7 @@
    collect
    show 
    save-as-table
+   col
    schema]
   
   [snowpark-clj.functions 
@@ -37,13 +39,7 @@
    eq
    gte
    lte
-   not-equal
-   and-fn
-   or-fn
-   not-fn
-   abs-fn
-   max-fn
-   min-fn
+   neq
    upper
    lower])
 
@@ -68,3 +64,27 @@
 (def ^{:arglists (:arglists (meta #'df/df-take))
        :doc (:doc (meta #'df/df-take))}
   take df/df-take)
+
+;; (def ^{:arglists (:arglists (meta #'df/df-keys))
+;;        :doc (:doc (meta #'df/df-keys))}
+;;   keys df/df-keys)
+
+;; (def ^{:arglists (:arglists (meta #'df/df-vals))
+;;        :doc (:doc (meta #'df/df-vals))}
+;;   vals df/df-vals)
+
+;; Same as above but done declaratively / data-driven style
+(let [alias-mappings [['fn/and-fn 'and]
+                      ['fn/or-fn 'or]
+                      ['fn/not-fn 'not]
+                      ['fn/abs-fn 'abs]
+                      ['fn/max-fn 'max]
+                      ['fn/min-fn 'min]]]
+  (doseq [[source-fn target-name] alias-mappings]
+    (let [source-var (resolve source-fn)]
+      (when source-var
+        (intern *ns* target-name
+                (with-meta @source-var
+                  (merge (meta source-var)
+                         {:arglists (:arglists (meta source-var))
+                          :doc (:doc (meta source-var))})))))))
