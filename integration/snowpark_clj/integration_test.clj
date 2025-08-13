@@ -1,12 +1,10 @@
 (ns snowpark-clj.integration-test
   "Integration tests for the snowpark-clj library"
-  (:require
-   [clojure.string :as str]
+  (:require 
    [clojure.test :refer [deftest is testing use-fixtures]]
    [malli.core :as m]
    [malli.generator :as mg]
-   [snowpark-clj.core :as sp]
-   [snowpark-clj.session :as session]
+   [snowpark-clj.core :as sp] 
    [snowpark-clj.dataframe :as df]))
 
 ;; Test data and schema
@@ -31,25 +29,25 @@
 (defn session-fixture
   "Create a session for testing and clean up afterwards"
   [f]
-  (let [session (sp/create-session "snowflake.edn")]
-    (binding [*session* session]
+  (let [session (sp/create-session "integration/snowflake.edn")]
+    (try
+      ;; Clean up any existing test table before running test
       (try
-        ;; Clean up any existing test table before running test
+        (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
+        (catch Exception e
+          (println "Warning: Could not drop table:" (.getMessage e))))
+      (binding [*session* session] 
+        (f))
+      (finally
+        ;; Clean up: drop test table and close session
         (try
           (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
           (catch Exception e
-            (println "Warning: Could not drop table:" (.getMessage e))))
-        (f)
-        (finally
-          ;; Clean up: drop test table and close session
-          (try
-            (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
-            (catch Exception e
-              (println "Warning: Could not drop table during cleanup:" (.getMessage e))))
-          (try
-            (sp/close-session session)
-            (catch Exception e
-              (println "Warning: Could not close session:" (.getMessage e)))))))))
+            (println "Warning: Could not drop table during cleanup:" (.getMessage e))))
+        (try
+          (sp/close-session session)
+          (catch Exception e
+            (println "Warning: Could not close session:" (.getMessage e))))))))
 
 (use-fixtures :each session-fixture)
 
@@ -133,7 +131,7 @@
 (deftest test-feature-3-session-macros
   (testing "Feature 3: Session macros work correctly"
     ;; Test with-session macro
-    (let [result (sp/with-session [session (sp/create-session "snowflake.edn")]
+    (let [result (sp/with-session [session (sp/create-session "integration/snowflake.edn")]
                    (let [df (sp/create-dataframe session test-data)]
                      (sp/count df)))]
       (is (= 3 result)))))
@@ -193,37 +191,6 @@
           (is (string? (:name row)))
           (is (boolean? (:active row)))
           (is (number? (:score row))))))))
-
-;; Session Management Tests
-(deftest test-session-management
-  (testing "Session management works correctly"
-    ;; Test session creation with properties file
-    (let [session (sp/create-session "snowflake.edn")]
-      (is (some? session))
-      (is (map? session))
-      (is (:session session))
-      (is (:read-key-fn session))
-      (is (:write-key-fn session))
-      (is (fn? (:read-key-fn session)))  ; Test it's a function rather than specific function
-      (is (fn? (:write-key-fn session))) ; Test it's a function rather than specific function
-      
-      ;; Test session options
-      (is (fn? (session/unwrap-read-key-fn session)))  ; Test it's a function rather than specific function
-      (is (fn? (session/unwrap-write-key-fn session))) ; Test it's a function rather than specific function
-      
-      ;; Clean up
-      (sp/close-session session))
-    
-    ;; Test session creation with custom options
-    (let [session (sp/create-session "snowflake.edn" 
-                                          {:read-key-fn identity 
-                                           :write-key-fn str/upper-case})]
-      (is (some? session))
-      (is (= identity (:read-key-fn session)))
-      (is (= str/upper-case (:write-key-fn session)))
-      
-      ;; Clean up
-      (sp/close-session session))))
 
 ;; Feature 5 Integration Tests (Map-like Column Access)
 (deftest test-feature-5-map-like-column-access

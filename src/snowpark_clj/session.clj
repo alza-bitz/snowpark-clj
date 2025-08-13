@@ -7,6 +7,7 @@
   (:import [com.snowflake.snowpark_java Session]))
 
 ;; Malli schema for Snowpark configuration
+;; FIXME if optional keys are provided, they must not be empty
 (def config-schema
   [:map {:closed true}
    [:url :string]
@@ -76,10 +77,11 @@
                          (aero/read-config config)
                          config)
          ;; Validate config with Malli
+         masked-config (dissoc loaded-config :password)
          _ (when-not (m/validate config-schema loaded-config)
              (throw (ex-info "Invalid config"
-                             {:config loaded-config
-                              :errors (me/humanize (m/explain config-schema loaded-config))})))
+                             {:config masked-config
+                              :errors (me/humanize (m/explain config-schema masked-config))})))
          ;; Convert keywords to strings for SessionBuilder
          config-map (into {} (for [[k v] loaded-config]
                                [(name k) (str v)]))

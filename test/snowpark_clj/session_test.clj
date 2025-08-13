@@ -9,6 +9,7 @@
    [spy.protocol :as protocol]))
 
 ;; Test data
+;; FIXME we have a config schema, so use generated test data instead of fixed
 (def test-config
   {:url "jdbc:snowflake://test.snowflakecomputing.com"
    :user "testuser"
@@ -111,6 +112,7 @@
                                "schema" "public"
                                "warehouse" "testwh"}]
 
+      ;; FIXME aero/read-config can be a spy
       (with-redefs [session/create-session-builder (fn [] mock-builder)
                     aero/read-config (fn [_] mock-config)]
         (let [result (session/create-session "test-config.edn")]
@@ -130,6 +132,11 @@
           (assert/called-with? (:configs mock-builder-spies) mock-builder expected-config-map)
           (assert/called-once? (:create mock-builder-configured-spies))))))
 
+  ;; FIXME split out invalid config tests, for example
+  ;; missing required fields
+  ;; extra fields
+  ;; optional fields are empty
+  ;; optional fields have wrong type
   (testing "Creating session with invalid config throws validation error"
     (let [invalid-config {:url "not-a-valid-url"
                           :user "testuser"}] ; missing required fields
