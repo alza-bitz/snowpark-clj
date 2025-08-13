@@ -112,9 +112,8 @@
                                "schema" "public"
                                "warehouse" "testwh"}]
 
-      ;; FIXME aero/read-config can be a spy
       (with-redefs [session/create-session-builder (fn [] mock-builder)
-                    aero/read-config (fn [_] mock-config)]
+                    aero/read-config (spy/stub mock-config)]
         (let [result (session/create-session "test-config.edn")]
 
           ;; Verify the result is properly wrapped
@@ -126,6 +125,9 @@
           (is (= :test ((:read-key-fn result) "TEST")))
           (is (= "TEST" ((:write-key-fn result) :test)))
           (is (= "mock-session" (:session result)))
+
+          (assert/called-once? aero/read-config)
+          (assert/called-with? aero/read-config "test-config.edn")
 
           ;; Verify the builder methods were called correctly
           (assert/called-once? (:configs mock-builder-spies))
