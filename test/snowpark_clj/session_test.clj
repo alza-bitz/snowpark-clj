@@ -3,20 +3,17 @@
   (:require
    [aero.core :as aero]
    [clojure.test :refer [deftest is testing]]
+   [malli.generator :as mg]
    [snowpark-clj.session :as session]
    [spy.assert :as assert]
    [spy.core :as spy]
    [spy.protocol :as protocol]))
 
 ;; Test data
-;; FIXME we have a config schema, so use generated test data instead of fixed
 (def test-config
   {:url "jdbc:snowflake://test.snowflakecomputing.com"
    :user "testuser"
-   :password "testpass"
-   :db "testdb"
-   :schema "public"
-   :warehouse "testwh"})
+   :password "testpass"})
 
 (defprotocol MockSessionBuilder
   (configs [this config-map] "Mock SessionBuilder.configs method")
@@ -59,7 +56,7 @@
       (is (= custom-write-key-fn result)))))
 
 (deftest test-close-session
-  (testing "Closing a session wrapper"
+  (testing "Close session in wrapper"
     (let [close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable
                                    (close [_] (close-spy "close-called")))
@@ -68,15 +65,12 @@
       (assert/called-with? close-spy "close-called"))))
 
 (deftest test-create-session
-    (testing "Creating session with map config"
+  (testing "Create session from config as map"
     (let [{:keys [mock-builder mock-builder-spies
-                  mock-builder-configured-spies]} (mock-builder) 
+                  mock-builder-configured-spies]} (mock-builder)
           expected-config-map {"url" "jdbc:snowflake://test.snowflakecomputing.com"
                                "user" "testuser"
-                               "password" "testpass"
-                               "db" "testdb"
-                               "schema" "public"
-                               "warehouse" "testwh"}]
+                               "password" "testpass"}]
 
       (with-redefs [session/create-session-builder (fn [] mock-builder)]
         (let [result (session/create-session test-config)]
@@ -96,21 +90,15 @@
           (assert/called-with? (:configs mock-builder-spies) mock-builder expected-config-map)
           (assert/called-once? (:create mock-builder-configured-spies))))))
 
-  (testing "Creating session with edn file config"
+  (testing "Create session from config as edn file"
     (let [{:keys [mock-builder mock-builder-spies
                   mock-builder-configured-spies]} (mock-builder)
           mock-config {:url "jdbc:snowflake://test.snowflakecomputing.com"
                        :user "testuser"
-                       :password "testpass"
-                       :db "testdb"
-                       :schema "public"
-                       :warehouse "testwh"}
+                       :password "testpass"}
           expected-config-map {"url" "jdbc:snowflake://test.snowflakecomputing.com"
                                "user" "testuser"
-                               "password" "testpass"
-                               "db" "testdb"
-                               "schema" "public"
-                               "warehouse" "testwh"}]
+                               "password" "testpass"}]
 
       (with-redefs [session/create-session-builder (fn [] mock-builder)
                     aero/read-config (spy/stub mock-config)]
@@ -134,20 +122,30 @@
           (assert/called-with? (:configs mock-builder-spies) mock-builder expected-config-map)
           (assert/called-once? (:create mock-builder-configured-spies))))))
 
-  ;; FIXME split out invalid config tests, for example
-  ;; missing required fields
-  ;; extra fields
-  ;; optional fields are empty
-  ;; optional fields have wrong type
-  (testing "Creating session with invalid config throws validation error"
-    (let [invalid-config {:url "not-a-valid-url"
-                          :user "testuser"}] ; missing required fields
-      
+  (testing "Create session with missing required keys throws validation error"
+    (let [invalid-config (dissoc (mg/generate session/config-schema) :url)]
       (is (thrown-with-msg? Exception #"Invalid config"
-                            (session/create-session invalid-config))))))
+                            (session/create-session invalid-config)))))
+
+  (testing "Create session with extra keys throws validation error"
+    (let [invalid-config (assoc (mg/generate session/config-schema) :extra "not-defined-in-schema")]
+      (is (thrown-with-msg? Exception #"Invalid config"
+                            (session/create-session invalid-config)))))
+
+  (testing "Create session with nil string keys throws validation error"
+    (doseq [config-key [:url :role]]
+      (let [invalid-config (assoc (mg/generate session/config-schema) config-key nil)]
+        (is (thrown-with-msg? Exception #"Invalid config"
+                              (session/create-session invalid-config))))))
+
+  (testing "Create session with empty string keys throws validation error"
+    (doseq [config-key [:url :role]]
+      (let [invalid-config (assoc (mg/generate session/config-schema) config-key "")]
+        (is (thrown-with-msg? Exception #"Invalid config"
+                              (session/create-session invalid-config)))))))
 
 (deftest test-with-session
-  (testing "with-session macro executes body and closes session"
+  (testing "With session macro executes body and closes session"
     (let [executed? (atom false)
           close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable
@@ -163,7 +161,7 @@
       (is @executed?)
       (assert/called-with? close-spy "close-called")))
 
-  (testing "with-session macro closes session even when exception occurs"
+  (testing "With session macro closes session even when exception occurs"
     (let [executed? (atom false)
           close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable

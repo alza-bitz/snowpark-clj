@@ -10,4 +10,4 @@
  ;; Driver version 3.22.0 or higher:
  ;; :disableOCSPChecks true
  ;; Driver version 3.5.0 or higher:
- :insecureMode "true"}
+ :insecureMode true}
