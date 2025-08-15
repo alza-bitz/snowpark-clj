@@ -7,7 +7,9 @@
    [malli.core :as m]
    [snowpark-clj.convert :as convert]
    [snowpark-clj.dataframe :as df]
+   [snowpark-clj.mocks :as mocks]
    [snowpark-clj.schema :as schema]
+   [snowpark-clj.wrapper :as wrapper]
    [spy.assert :as assert]
    [spy.core :as spy]
    [spy.protocol :as protocol])
@@ -52,15 +54,20 @@
   (mode [this mode-str] "Mock DataFrameWriter.mode method")
   (options [this options-map] "Mock DataFrameWriter.options method"))
 
-(defprotocol MockStructType
-  (names [_] "Mock StructType.names method"))
-
 (defn- mock-session []
   (let [mock (protocol/mock MockSession
                             (createDataFrame [_ _ _] "createDataFrame")
                             (table [_ _] "table"))]
     {:mock-session mock
-     :mock-session-spies (spy.protocol/spies mock)}))
+     :mock-session-spies (protocol/spies mock)}))
+
+(defn- mock-session-wrapper [mock-session opts]
+  (let [mock (protocol/mock wrapper/IWrappedSessionOptions
+                            (unwrap [_] mock-session)
+                            (unwrap-option [_ option-key] (get opts option-key))
+                            (unwrap-options [_] opts))]
+    {:mock-session-wrapper mock
+     :mock-session-wrapper-spies (protocol/spies mock)}))
 
 (defn- mock-dataframe-writer []
   (let [mock-with-options (protocol/mock MockDataFrameWriter
@@ -81,13 +88,6 @@
      :mock-writer-with-mode-spies (protocol/spies mock-with-mode)
      :mock-writer-with-options mock-with-options
      :mock-writer-with-options-spies (protocol/spies mock-with-options)}))
-
-(defn- mock-schema
-  [field-names]
-  (let [mock (protocol/mock MockStructType
-                            (names [_] (into-array String field-names)))]
-    {:mock-schema mock
-     :mock-schema-spies (protocol/spies mock)}))
 
 (defn- mock-dataframe 
   [& {:keys [lazy-chain? mock-writer mock-schema]
@@ -112,49 +112,49 @@
   "Returns a minimal wrapper for tests that don't need map access."
   [df opts]
   (reify
-    snowpark_clj.dataframe.IWrappedDataFrame
-    (unwrap-dataframe [_] df)
+    wrapper/IWrappedSessionOptions
+    (unwrap [_] df)
     (unwrap-option [_ option-key] (get opts option-key))
     (unwrap-options [_] opts)))
 
 (deftest test-create-dataframe
   (testing "Creating DataFrame from Clojure data (2-arity)"
     (let [{:keys [mock-session mock-session-spies]} (mock-session)
-          session-wrapper {:session mock-session 
-                           :read-key-fn keyword 
-                           :write-key-fn name}
+          opts {:read-key-fn keyword
+                :write-key-fn name}
+          {:keys [mock-session-wrapper]} (mock-session-wrapper mock-session opts)
           mock-schema (reify Object (toString [_] "mock-schema"))
           mock-rows []]
-      
+  
       (with-redefs [schema/infer-schema (fn [_session _data] mock-schema)
-                    convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)] 
-        (let [result (df/create-dataframe session-wrapper test-data)]
-          
+                    convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)]
+        (let [result (df/create-dataframe mock-session-wrapper test-data)]
+  
           ;; Verify the result is properly wrapped
-          (is (= "createDataFrame" (df/unwrap-dataframe result)))
-          (is (= keyword (df/unwrap-option result :read-key-fn)))
-          (is (= name (df/unwrap-option result :write-key-fn)))
-          
+          (is (= "createDataFrame" (wrapper/unwrap result)))
+          (is (= keyword (wrapper/unwrap-option result :read-key-fn)))
+          (is (= name (wrapper/unwrap-option result :write-key-fn)))
+  
           ;; Verify that the mock session's createDataFrame was called correctly
           (assert/called-once? (:createDataFrame mock-session-spies))
           (assert/called-with? (:createDataFrame mock-session-spies) mock-session mock-rows mock-schema)))))
   
   (testing "Creating DataFrame from Clojure data with explicit Snowpark schema (3-arity)"
     (let [{:keys [mock-session mock-session-spies]} (mock-session)
-          session-wrapper {:session mock-session 
-                           :read-key-fn keyword 
-                           :write-key-fn name}
-          snowpark-schema (schema/malli-schema->snowpark-schema session-wrapper test-employee-schema)
+          opts {:read-key-fn keyword
+                :write-key-fn name}
+          {:keys [mock-session-wrapper]} (mock-session-wrapper mock-session opts)
+          snowpark-schema (schema/malli-schema->snowpark-schema mock-session-wrapper test-employee-schema)
           mock-rows []]
-      
+  
       (with-redefs [convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)]
-        (let [result (df/create-dataframe session-wrapper test-data snowpark-schema)]
-          
+        (let [result (df/create-dataframe mock-session-wrapper test-data snowpark-schema)]
+  
           ;; Verify the result is properly wrapped
-          (is (= "createDataFrame" (df/unwrap-dataframe result)))
-          (is (= keyword (df/unwrap-option result :read-key-fn)))
-          (is (= name (df/unwrap-option result :write-key-fn)))
-          
+          (is (= "createDataFrame" (wrapper/unwrap result)))
+          (is (= keyword (wrapper/unwrap-option result :read-key-fn)))
+          (is (= name (wrapper/unwrap-option result :write-key-fn)))
+  
           ;; Verify that the mock session's createDataFrame was called correctly
           (assert/called-once? (:createDataFrame mock-session-spies))
           (assert/called-with? (:createDataFrame mock-session-spies) mock-session mock-rows snowpark-schema)))))
@@ -162,22 +162,22 @@
   (testing "Creating DataFrame from empty data should throw exception"
     (is (thrown-with-msg? IllegalArgumentException 
                           #"Cannot create dataframe from empty data"
-                          (df/create-dataframe {:session nil :key-fn identity} [])))))
+                          (df/create-dataframe (mock-session-wrapper (mock-session) {}) [])))))
 
 (deftest test-table
   (testing "Table function calls session.table with correct parameters"
     (let [{:keys [mock-session mock-session-spies]} (mock-session)
-          session-wrapper {:session mock-session 
-                           :read-key-fn keyword 
-                           :write-key-fn (comp str/upper-case name)}
+          opts {:read-key-fn keyword
+                :write-key-fn (comp str/upper-case name)}
+          {:keys [mock-session-wrapper]} (mock-session-wrapper mock-session opts)
           table-name "test_table"]
 
-      (let [result (df/table session-wrapper table-name)]
+      (let [result (df/table mock-session-wrapper table-name)]
         ;; Verify the result is properly wrapped
-        (is (= "table" (df/unwrap-dataframe result)))
-        (is (= (:read-key-fn session-wrapper) (df/unwrap-option result :read-key-fn)))
-        (is (= (:write-key-fn session-wrapper) (df/unwrap-option result :write-key-fn))))
-      
+        (is (= "table" (wrapper/unwrap result)))
+        (is (= (:read-key-fn opts) (wrapper/unwrap-option result :read-key-fn)))
+        (is (= (:write-key-fn opts) (wrapper/unwrap-option result :write-key-fn))))
+
       ;; Verify that the mock session's table was called correctly
       (assert/called-once? (:table mock-session-spies))
       (assert/called-with? (:table mock-session-spies) mock-session table-name))))
@@ -190,9 +190,9 @@
           result (df/select (mock-dataframe-wrapper mock-dataframe opts) columns)]
       
       ;; Verify the result is properly wrapped
-      (is (= "select" (df/unwrap-dataframe result)))
-      (is (= (:read-key-fn opts) (df/unwrap-option result :read-key-fn)))
-      (is (= (:write-key-fn opts) (df/unwrap-option result :write-key-fn)))
+      (is (= "select" (wrapper/unwrap result)))
+      (is (= (:read-key-fn opts) (wrapper/unwrap-option result :read-key-fn)))
+      (is (= (:write-key-fn opts) (wrapper/unwrap-option result :write-key-fn)))
       
       ;; Verify that the mock dataframe's select was called correctly
       ;; The columns should be decoded to string array: ["NAME", "SALARY"]
@@ -213,9 +213,9 @@
         (let [column-obj (Functions/col "SALARY")
               result (df/df-filter (mock-dataframe-wrapper mock-dataframe opts) column-obj)]
           ;; The result should be a wrapped dataframe
-          (is (= "filter" (df/unwrap-dataframe result)))
-          (is (= (:read-key-fn opts) (df/unwrap-option result :read-key-fn)))
-          (is (= (:write-key-fn opts) (df/unwrap-option result :write-key-fn)))
+          (is (= "filter" (wrapper/unwrap result)))
+          (is (= (:read-key-fn opts) (wrapper/unwrap-option result :read-key-fn)))
+          (is (= (:write-key-fn opts) (wrapper/unwrap-option result :write-key-fn)))
           ;; Check that the underlying DataFrame.filter was called with the column object
           (assert/called-once? (:filter mock-dataframe-spies))
           (assert/called-with? (:filter mock-dataframe-spies) mock-dataframe column-obj)))
@@ -223,9 +223,9 @@
       (testing "with encoded column name"
         (let [result (df/df-filter (mock-dataframe-wrapper mock-dataframe opts) :salary)]
           ;; The result should be a wrapped dataframe
-          (is (= "filter" (df/unwrap-dataframe result)))
-          (is (= (:read-key-fn opts) (df/unwrap-option result :read-key-fn)))
-          (is (= (:write-key-fn opts) (df/unwrap-option result :write-key-fn)))
+          (is (= "filter" (wrapper/unwrap result)))
+          (is (= (:read-key-fn opts) (wrapper/unwrap-option result :read-key-fn)))
+          (is (= (:write-key-fn opts) (wrapper/unwrap-option result :write-key-fn)))
           ;; Check that a Column was created using decoded name, then filter was called
           (assert/called-once? (:col mock-dataframe-spies))
           (assert/called-with? (:col mock-dataframe-spies) mock-dataframe "SALARY")
@@ -239,9 +239,9 @@
           result (df/limit (mock-dataframe-wrapper mock-dataframe opts) limit-count)]
       
       ;; Verify the result is properly wrapped
-      (is (= "limit" (df/unwrap-dataframe result)))
-      (is (= (:read-key-fn opts) (df/unwrap-option result :read-key-fn)))
-      (is (= (:write-key-fn opts) (df/unwrap-option result :write-key-fn)))
+      (is (= "limit" (wrapper/unwrap result)))
+      (is (= (:read-key-fn opts) (wrapper/unwrap-option result :read-key-fn)))
+      (is (= (:write-key-fn opts) (wrapper/unwrap-option result :write-key-fn)))
       
       ;; Verify that the mock dataframe's limit was called correctly
       (assert/called-once? (:limit mock-dataframe-spies))
@@ -256,15 +256,15 @@
       
       ;; Test single column
       (let [result1 (df/df-sort (mock-dataframe-wrapper mock-dataframe opts) single-col)]
-        (is (= "sort" (df/unwrap-dataframe result1)))
-        (is (= (:read-key-fn opts) (df/unwrap-option result1 :read-key-fn)))
-        (is (= (:write-key-fn opts) (df/unwrap-option result1 :write-key-fn))))
+        (is (= "sort" (wrapper/unwrap result1)))
+        (is (= (:read-key-fn opts) (wrapper/unwrap-option result1 :read-key-fn)))
+        (is (= (:write-key-fn opts) (wrapper/unwrap-option result1 :write-key-fn))))
       
       ;; Test multiple columns
       (let [result2 (df/df-sort (mock-dataframe-wrapper mock-dataframe opts) multi-cols)]
-        (is (= "sort" (df/unwrap-dataframe result2)))
-        (is (= (:read-key-fn opts) (df/unwrap-option result2 :read-key-fn)))
-        (is (= (:write-key-fn opts) (df/unwrap-option result2 :write-key-fn))))
+        (is (= "sort" (wrapper/unwrap result2)))
+        (is (= (:read-key-fn opts) (wrapper/unwrap-option result2 :read-key-fn)))
+        (is (= (:write-key-fn opts) (wrapper/unwrap-option result2 :write-key-fn))))
       
       ;; Verify sort was called twice with Column arrays
       (assert/called-n-times? (:sort mock-dataframe-spies) 2)
@@ -284,9 +284,9 @@
           result (df/df-group-by (mock-dataframe-wrapper mock-dataframe opts) columns)]
       
       ;; Verify the result is properly wrapped
-      (is (= "groupBy" (df/unwrap-dataframe result)))
-      (is (= (:read-key-fn opts) (df/unwrap-option result :read-key-fn)))
-      (is (= (:write-key-fn opts) (df/unwrap-option result :write-key-fn)))
+      (is (= "groupBy" (wrapper/unwrap result)))
+      (is (= (:read-key-fn opts) (wrapper/unwrap-option result :read-key-fn)))
+      (is (= (:write-key-fn opts) (wrapper/unwrap-option result :write-key-fn)))
       
       ;; Verify that the mock dataframe's groupBy was called correctly
       ;; The columns should be decoded based on to-columns-or-names 
@@ -309,15 +309,15 @@
       
       ;; Test default join type (2-arity)
       (let [result1 (df/join (mock-dataframe-wrapper mock-dataframe opts) (mock-dataframe-wrapper other-mock-dataframe opts) join-expr)]
-        (is (= "join" (df/unwrap-dataframe result1)))
-        (is (= (:read-key-fn opts) (df/unwrap-option result1 :read-key-fn)))
-        (is (= (:write-key-fn opts) (df/unwrap-option result1 :write-key-fn))))
+        (is (= "join" (wrapper/unwrap result1)))
+        (is (= (:read-key-fn opts) (wrapper/unwrap-option result1 :read-key-fn)))
+        (is (= (:write-key-fn opts) (wrapper/unwrap-option result1 :write-key-fn))))
       
       ;; Test explicit join type (3-arity)
       (let [result2 (df/join (mock-dataframe-wrapper mock-dataframe opts) (mock-dataframe-wrapper other-mock-dataframe opts) join-expr :left)]
-        (is (= "join" (df/unwrap-dataframe result2)))
-        (is (= (:read-key-fn opts) (df/unwrap-option result2 :read-key-fn)))
-        (is (= (:write-key-fn opts) (df/unwrap-option result2 :write-key-fn))))
+        (is (= "join" (wrapper/unwrap result2)))
+        (is (= (:read-key-fn opts) (wrapper/unwrap-option result2 :read-key-fn)))
+        (is (= (:write-key-fn opts) (wrapper/unwrap-option result2 :write-key-fn))))
       
       ;; Verify join was called twice with correct parameters
       (assert/called-n-times? (:join mock-dataframe-spies) 2)
@@ -484,10 +484,10 @@
 
 (deftest test-wrap-dataframe
   (testing "DataFrame wrapper supports map-like column access (feature 5)"
-    (let [{:keys [mock-schema]} (mock-schema #{"NAME" "SALARY" "AGE" "DEPARTMENT" "ID"})
+    (let [{:keys [mock-schema]} (mocks/mock-schema ["NAME" "SALARY" "AGE" "DEPARTMENT" "ID"])
           {:keys [mock-dataframe mock-dataframe-spies]} (mock-dataframe {:mock-schema mock-schema})
           test-df (#'df/wrap-dataframe mock-dataframe {:write-key-fn (comp str/upper-case name)
-                                                     :read-key-fn (comp keyword str/lower-case)})]
+                                                       :read-key-fn (comp keyword str/lower-case)})]
 
       (testing "IFn access: (df :column)"
         (let [result (test-df :name)]

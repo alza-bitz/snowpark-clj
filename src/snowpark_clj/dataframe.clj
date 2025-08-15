@@ -3,13 +3,7 @@
   (:require
    [snowpark-clj.convert :as convert]
    [snowpark-clj.schema :as schema]
-   [snowpark-clj.session :as session]))
-
-(defprotocol IWrappedDataFrame
-  "Protocol for accessing the Snowpark DataFrame and session options of a wrapped dataframe"
-  (unwrap-dataframe [this] "Get the Snowpark DataFrame from a dataframe wrapper")
-  (unwrap-option [this option-key] "Get an option from a dataframe wrapper") 
-  (unwrap-options [this] "Get all options from a dataframe wrapper"))
+   [snowpark-clj.wrapper :as wrapper]))
 
 (defn- wrap-dataframe
   "Wrap a Snowpark DataFrame with session options and map-like column access"
@@ -101,10 +95,11 @@
         (.toString base-map))
       
       ;; Implement the protocol for accessing wrapped dataframe
-      IWrappedDataFrame
-      (unwrap-dataframe [_] (:dataframe base-map))
+      wrapper/IWrappedSessionOptions
+      (unwrap [_] (:dataframe base-map))
       (unwrap-option [_ option-key] (get base-map option-key))
-      (unwrap-options [_] (dissoc base-map :dataframe)))))
+      (unwrap-options [_] (dissoc base-map :dataframe)))
+      ))
 
 ;; Helper functions for consistent column argument handling
 
@@ -167,11 +162,11 @@
   ([session data schema]
    (when (empty? data)
      (throw (IllegalArgumentException. "Cannot create dataframe from empty data"))) 
-   (let [raw-session (session/unwrap-session session)
-         write-key-fn (session/unwrap-write-key-fn session)
+   (let [raw-session (wrapper/unwrap session)
+         write-key-fn (wrapper/unwrap-option session :write-key-fn)
          rows (convert/maps->rows data schema write-key-fn)
          dataframe (.createDataFrame raw-session rows schema)]
-     (wrap-dataframe dataframe (session/unwrap-options session)))))
+     (wrap-dataframe dataframe (wrapper/unwrap-options session)))))
 
 (defn table
   "Create a dataframe from a Snowflake table.
@@ -182,9 +177,9 @@
    
    Returns: A dataframe wrapper with the session options and map-like column access"
   [session table-name]
-  (let [raw-session (session/unwrap-session session)
+  (let [raw-session (wrapper/unwrap session)
         dataframe (.table raw-session table-name)]
-    (wrap-dataframe dataframe (session/unwrap-options session))))
+    (wrap-dataframe dataframe (wrapper/unwrap-options session))))
 
 (defn sql
   "Execute SQL query and return a wrapped dataframe.
@@ -195,9 +190,9 @@
    
    Returns: A dataframe wrapper with the session options and map-like column access"
   [session query]
-  (let [raw-session (session/unwrap-session session)
+  (let [raw-session (wrapper/unwrap session)
         dataframe (.sql raw-session query)]
-    (wrap-dataframe dataframe (session/unwrap-options session))))
+    (wrap-dataframe dataframe (wrapper/unwrap-options session))))
 
 ;; Dataframe transformation functions (lazy)
 
@@ -210,11 +205,11 @@
    
    Returns: A dataframe wrapper"
   [df cols]
-  (let [raw-df (unwrap-dataframe df)
-        write-key-fn (unwrap-option df :write-key-fn)
+  (let [raw-df (wrapper/unwrap df)
+        write-key-fn (wrapper/unwrap-option df :write-key-fn)
         col-array (to-columns-or-names cols write-key-fn)
         result-df (.select raw-df col-array)]
-    (wrap-dataframe result-df (unwrap-options df))))
+    (wrap-dataframe result-df (wrapper/unwrap-options df))))
 
 (defn df-filter
   "Filter rows in a dataframe using a condition.
@@ -225,13 +220,13 @@
    
    Returns: A dataframe wrapper"
   [df condition]
-  (let [raw-df (unwrap-dataframe df)
-        write-key-fn (unwrap-option df :write-key-fn)
+  (let [raw-df (wrapper/unwrap df)
+        write-key-fn (wrapper/unwrap-option df :write-key-fn)
         col-condition (if (instance? com.snowflake.snowpark_java.Column condition)
                         condition
                         (.col raw-df (write-key-fn condition)))
         result-df (.filter raw-df col-condition)]
-    (wrap-dataframe result-df (unwrap-options df))))
+    (wrap-dataframe result-df (wrapper/unwrap-options df))))
 
 (defn where
   "Alias for df-filter"
@@ -247,9 +242,9 @@
    
    Returns: A dataframe wrapper"
   [df n]
-  (let [raw-df (unwrap-dataframe df)
+  (let [raw-df (wrapper/unwrap df)
         result-df (.limit raw-df n)]
-    (wrap-dataframe result-df (unwrap-options df))))
+    (wrap-dataframe result-df (wrapper/unwrap-options df))))
 
 (defn df-sort
   "Sort a dataframe by columns.
@@ -260,11 +255,11 @@
    
    Returns: A dataframe wrapper"
   [df cols]
-  (let [raw-df (unwrap-dataframe df)
-        write-key-fn (unwrap-option df :write-key-fn)
+  (let [raw-df (wrapper/unwrap df)
+        write-key-fn (wrapper/unwrap-option df :write-key-fn)
         col-array (to-columns cols write-key-fn raw-df)
         result-df (.sort raw-df col-array)]
-    (wrap-dataframe result-df (unwrap-options df))))
+    (wrap-dataframe result-df (wrapper/unwrap-options df))))
 
 (defn df-group-by
   "Group a dataframe by columns.
@@ -275,11 +270,11 @@
    
    Returns: A grouped dataframe wrapper"
   [df cols]
-  (let [raw-df (unwrap-dataframe df)
-        write-key-fn (unwrap-option df :write-key-fn)
+  (let [raw-df (wrapper/unwrap df)
+        write-key-fn (wrapper/unwrap-option df :write-key-fn)
         col-array (to-columns-or-names cols write-key-fn)
         result-grouped-df (.groupBy raw-df col-array)]
-    (wrap-dataframe result-grouped-df (unwrap-options df))))
+    (wrap-dataframe result-grouped-df (wrapper/unwrap-options df))))
 
 (defn join
   "Join two dataframes.
@@ -294,8 +289,8 @@
   ([left right join-exprs]
    (join left right join-exprs :inner))
   ([left right join-exprs join-type]
-   (let [left-raw (unwrap-dataframe left)
-         right-raw (unwrap-dataframe right)
+   (let [left-raw (wrapper/unwrap left)
+         right-raw (wrapper/unwrap right)
          join-type-str (case join-type
                          :inner "inner"
                          :left "left"
@@ -304,7 +299,7 @@
                          :full "outer"
                          (name join-type))
          result (.join left-raw right-raw join-exprs join-type-str)]
-     (wrap-dataframe result (unwrap-options left)))))
+     (wrap-dataframe result (wrapper/unwrap-options left)))))
 
 ;; Dataframe action functions (eager)
 
@@ -316,8 +311,8 @@
    
    Returns: Vector of maps with keys encoded using read-key-fn"
   [df]
-  (let [raw-df (unwrap-dataframe df)
-        read-key-fn (unwrap-option df :read-key-fn)
+  (let [raw-df (wrapper/unwrap df)
+        read-key-fn (wrapper/unwrap-option df :read-key-fn)
         collected-rows (.collect raw-df)
         schema (.schema raw-df)]
     (convert/rows->maps collected-rows schema read-key-fn)))
@@ -332,7 +327,7 @@
    Side effect: Prints to stdout"
   ([df] (show df 20))
   ([df n]
-   (let [raw-df (unwrap-dataframe df)]
+   (let [raw-df (wrapper/unwrap df)]
      (.show raw-df n))))
 
 (defn df-count
@@ -343,7 +338,7 @@
    
    Returns: Long"
   [df]
-  (let [raw-df (unwrap-dataframe df)]
+  (let [raw-df (wrapper/unwrap df)]
     (.count raw-df)))
 
 (defn df-take
@@ -373,13 +368,13 @@
       :table-type \"transient\"             ; Table type
       ...}                                  ; Other Snowflake writer options"
   ([df table-name]
-   (let [raw-df (unwrap-dataframe df)
+   (let [raw-df (wrapper/unwrap df)
          writer (.write raw-df)]
      (.saveAsTable writer table-name)))
   ([df table-name mode]
    (save-as-table df table-name mode {}))
   ([df table-name mode options]
-   (let [raw-df (unwrap-dataframe df)
+   (let [raw-df (wrapper/unwrap df)
          writer (.write raw-df)
          mode-str (case mode
                     :overwrite "overwrite"
@@ -406,8 +401,8 @@
    
    Returns: Snowpark Column object"
   [df col-name]
-  (let [raw-df (unwrap-dataframe df)
-        write-key-fn (unwrap-option df :write-key-fn)
+  (let [raw-df (wrapper/unwrap df)
+        write-key-fn (wrapper/unwrap-option df :write-key-fn)
         decoded-name (write-key-fn col-name)]
     (.col raw-df decoded-name)))
 
@@ -416,5 +411,5 @@
 (defn schema
   "Get the schema of a dataframe"
   [df]
-  (let [raw-df (unwrap-dataframe df)]
+  (let [raw-df (wrapper/unwrap df)]
     (.schema raw-df)))

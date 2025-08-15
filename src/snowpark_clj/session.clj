@@ -5,34 +5,19 @@
    [malli.core :as m]
    [malli.error :as me]
    [mask.core :as mask]
-   [snowpark-clj.config :as config])
+   [snowpark-clj.config :as config]
+   [snowpark-clj.wrapper :as wrapper])
   (:import
    [com.snowflake.snowpark_java Session]))
-
-(defn unwrap-session
-  "Extract the Snowpark Session from a session wrapper"
-  [session-wrapper]
-  (:session session-wrapper))
-
-(defn unwrap-read-key-fn
-  "Extract the read-key-fn from a session wrapper"
-  [session-wrapper]
-  (:read-key-fn session-wrapper))
-
-(defn unwrap-write-key-fn
-  "Extract the write-key-fn from a session wrapper"
-  [session-wrapper]
-  (:write-key-fn session-wrapper))
-
-(defn unwrap-options
-  "Extract all options from a session wrapper"
-  [session]
-  (dissoc session :session))
 
 (defn- wrap-session
   "Wrap a Snowpark Session with session options"
   [session opts]
-  (merge {:session session} opts))
+  (reify
+      wrapper/IWrappedSessionOptions
+      (unwrap [_] session)
+      (unwrap-option [_ option-key] (get opts option-key))
+      (unwrap-options [_] opts)))
 
 (defn create-session-builder
   "Create a new SessionBuilder instance"
@@ -77,7 +62,7 @@
 (defn close-session
   "Close a session"
   [session-wrapper]
-  (.close (:session session-wrapper)))
+  (.close (wrapper/unwrap session-wrapper)))
 
 (defmacro with-session
   "Execute body with a session, automatically closing when done.

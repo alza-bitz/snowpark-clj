@@ -1,7 +1,7 @@
 (ns snowpark-clj.schema
   (:require
    [malli.core :as m]
-   [snowpark-clj.session :as session]) 
+   [snowpark-clj.wrapper :as wrapper]) 
   (:import
    [com.snowflake.snowpark_java.types DataTypes StructField StructType]
    [java.sql Date Timestamp]))
@@ -25,7 +25,7 @@
   "Infer Snowpark schema from a collection of maps.
    
    Args:
-   - session: Snowpark session wrapper including :write-key-fn for decoding schema field names
+   - session: Session wrapper including :write-key-fn for decoding schema field names
    - data: Collection of maps representing rows to infer schema from
    
    Returns a StructType representing the schema."
@@ -33,7 +33,7 @@
   (when (empty? data)
     (throw (IllegalArgumentException. "Cannot infer schema from empty collection")))
 
-  (let [write-key-fn (session/unwrap-write-key-fn session)
+  (let [write-key-fn (wrapper/unwrap-option session :write-key-fn)
         sample-map (first data)
         fields (for [[k v] sample-map]
                  (StructField. (write-key-fn k) (clojure-value->data-type v) true))]
@@ -83,7 +83,7 @@
     [:active :boolean]]
    
    Args:
-   - session: Snowpark session wrapper including :write-key-fn for decoding schema field names
+   - session: Session wrapper including :write-key-fn for decoding schema field names
    - malli-schema: Malli schema
     
    Returns a StructType that can be used with Snowpark DataFrames."
@@ -96,7 +96,7 @@
       (throw (IllegalArgumentException. "Only map schemas are supported for conversion to Snowpark schema")))
     
     (let [field-schemas (rest parsed)
-          write-key-fn (session/unwrap-write-key-fn session)
+          write-key-fn (wrapper/unwrap-option session :write-key-fn)
           fields (for [[field-name field-type] field-schemas]
                    (let [snowpark-type (malli-type->data-type field-type)]
                      (StructField. (write-key-fn field-name) snowpark-type true)))]
