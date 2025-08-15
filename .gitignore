@@ -13,4 +13,5 @@ pom.xml.asc
 .clj-kondo/
 .lsp/
 
-snowflake.properties
+.actsecrets
+snowflake.edn

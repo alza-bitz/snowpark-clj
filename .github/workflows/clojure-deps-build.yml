@@ -6,6 +6,10 @@ on:
       test:
         type: boolean
         default: true
+      integration:
+        type: boolean
+        default: false
+
 env:
   GH_PACKAGES_USR: ${{ secrets.GH_PACKAGES_USR }}
   GH_PACKAGES_PSW: ${{ secrets.GH_PACKAGES_PSW }}
@@ -21,3 +25,15 @@ jobs:
         with:
           java-version: ${{ inputs.java-version }}
       - run: clojure -M:test
+  integration:
+    if: ${{ inputs.integration == true }}
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+    steps:
+      - run: if [ -z $SNOWFLAKE_PASSWORD ]; then echo "SNOWFLAKE_PASSWORD not set or empty"; exit 1; fi
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/clojure-setup
+        with:
+          java-version: ${{ inputs.java-version }}
+      - run: clojure -M:integration

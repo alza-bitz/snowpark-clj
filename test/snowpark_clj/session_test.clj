@@ -1,19 +1,18 @@
 (ns snowpark-clj.session-test
   "Basic unit tests for the session namespace"
-  (:require [clojure.test :refer [deftest testing is]]
-            [snowpark-clj.session :as session]
-            [spy.core :as spy]
-            [spy.assert :as assert]
-            [spy.protocol :as protocol]))
+  (:require
+   [aero.core :as aero]
+   [clojure.test :refer [deftest is testing]]
+   [mask.core :as mask]
+   [snowpark-clj.session :as session]
+   [spy.assert :as assert]
+   [spy.core :as spy]
+   [spy.protocol :as protocol]))
 
-;; Test data
 (def test-config
-  {:URL "jdbc:snowflake://test.snowflakecomputing.com"
-   :USER "testuser"
-   :PASSWORD "testpass"
-   :DATABASE "testdb"
-   :SCHEMA "public"
-   :WAREHOUSE "testwh"})
+  {:url "jdbc:snowflake://test.snowflakecomputing.com"
+   :user "testuser"
+   :password (mask/mask "testpass")})
 
 (defprotocol MockSessionBuilder
   (configs [this config-map] "Mock SessionBuilder.configs method")
@@ -56,7 +55,7 @@
       (is (= custom-write-key-fn result)))))
 
 (deftest test-close-session
-  (testing "Closing a session wrapper"
+  (testing "Close session in wrapper"
     (let [close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable
                                    (close [_] (close-spy "close-called")))
@@ -65,15 +64,12 @@
       (assert/called-with? close-spy "close-called"))))
 
 (deftest test-create-session
-  (testing "Creating session with map config using SessionBuilder.configs()"
+  (testing "Create session from config as map"
     (let [{:keys [mock-builder mock-builder-spies
-                  mock-builder-configured-spies]} (mock-builder) 
-          expected-config-map {"URL" "jdbc:snowflake://test.snowflakecomputing.com"
-                               "USER" "testuser"
-                               "PASSWORD" "testpass"
-                               "DATABASE" "testdb"
-                               "SCHEMA" "public"
-                               "WAREHOUSE" "testwh"}]
+                  mock-builder-configured-spies]} (mock-builder)
+          expected-config-map {"url" "jdbc:snowflake://test.snowflakecomputing.com"
+                               "user" "testuser"
+                               "password" "testpass"}]
 
       (with-redefs [session/create-session-builder (fn [] mock-builder)]
         (let [result (session/create-session test-config)]
@@ -93,12 +89,19 @@
           (assert/called-with? (:configs mock-builder-spies) mock-builder expected-config-map)
           (assert/called-once? (:create mock-builder-configured-spies))))))
 
-  (testing "Creating session with properties file path using SessionBuilder.configFile()"
+  (testing "Create session from config as edn file"
     (let [{:keys [mock-builder mock-builder-spies
-                  mock-builder-configured-spies]} (mock-builder)]
+                  mock-builder-configured-spies]} (mock-builder)
+          mock-config {:url "jdbc:snowflake://test.snowflakecomputing.com"
+                       :user "testuser"
+                       :password (mask/mask "testpass")}
+          expected-config-map {"url" "jdbc:snowflake://test.snowflakecomputing.com"
+                               "user" "testuser"
+                               "password" "testpass"}]
 
-      (with-redefs [session/create-session-builder (fn [] mock-builder)]
-        (let [result (session/create-session "test.properties")]
+      (with-redefs [session/create-session-builder (fn [] mock-builder)
+                    aero/read-config (spy/stub mock-config)]
+        (let [result (session/create-session "test-config.edn")]
 
           ;; Verify the result is properly wrapped
           (is (map? result))
@@ -110,13 +113,27 @@
           (is (= "TEST" ((:write-key-fn result) :test)))
           (is (= "mock-session" (:session result)))
 
+          (assert/called-once? aero/read-config)
+          (assert/called-with? aero/read-config "test-config.edn")
+
           ;; Verify the builder methods were called correctly
-          (assert/called-once? (:configFile mock-builder-spies))
-          (assert/called-with? (:configFile mock-builder-spies) mock-builder "test.properties")
-          (assert/called-once? (:create mock-builder-configured-spies)))))))
+          (assert/called-once? (:configs mock-builder-spies))
+          (assert/called-with? (:configs mock-builder-spies) mock-builder expected-config-map)
+          (assert/called-once? (:create mock-builder-configured-spies))))))
+
+  (testing "Create session with invalid config throws exception"
+    (let [{:keys [mock-builder mock-builder-spies
+                  mock-builder-configured-spies]} (mock-builder)
+          invalid-config nil]
+      (with-redefs [session/create-session-builder (fn [] mock-builder)]
+        (is (thrown-with-msg? Exception #"Invalid config"
+                              (session/create-session invalid-config)))
+        ;; Verify the builder methods were not called
+        (assert/not-called? (:configs mock-builder-spies))
+        (assert/not-called? (:create mock-builder-configured-spies))))))
 
 (deftest test-with-session
-  (testing "with-session macro executes body and closes session"
+  (testing "With session macro executes body and closes session"
     (let [executed? (atom false)
           close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable
@@ -132,7 +149,7 @@
       (is @executed?)
       (assert/called-with? close-spy "close-called")))
 
-  (testing "with-session macro closes session even when exception occurs"
+  (testing "With session macro closes session even when exception occurs"
     (let [executed? (atom false)
           close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable

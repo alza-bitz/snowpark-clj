@@ -1,7 +1,13 @@
 (ns snowpark-clj.session
   "The internal API for Snowpark session functions."
-  (:require [clojure.string :as str])
-  (:import [com.snowflake.snowpark_java Session]))
+  (:require
+   [clojure.string :as str]
+   [malli.core :as m]
+   [malli.error :as me]
+   [mask.core :as mask]
+   [snowpark-clj.config :as config])
+  (:import
+   [com.snowflake.snowpark_java Session]))
 
 (defn unwrap-session
   "Extract the Snowpark Session from a session wrapper"
@@ -38,33 +44,35 @@
    :write-key-fn (comp str/upper-case name)})
 
 (defn create-session
-  "Create a session with optional column name encoding and decoding functions.
-   
-   Two ways to create a session:
-   1. With a map of keywords corresponding to Snowpark properties (uses SessionBuilder.configs())
-   2. With a path to a properties file (uses SessionBuilder.configFile())
-   
+  "Create a session from a map or edn file config, with optional column name encoding and decoding functions.
+      
    Args:
-   - config: Map with connection parameters (keywords) or path to properties file (string)
-   - opts: Optional map that can include:
+   - config: Map or the path of an edn file, either must conform to config/config-schema
+   - opts: Map that can include:
      - :read-key-fn - function to encode column names on dataset read operations
      - :write-key-fn - function to decode column names on dataset write operations
    
    Returns: A session wrapper with the session options"
-  [config & {:keys [read-key-fn write-key-fn] :or {read-key-fn (:read-key-fn default-opts)
-                                                   write-key-fn (:write-key-fn default-opts)} :as opts}]
-  (let [builder (create-session-builder)
-        configured-builder (if (string? config)
-                             ;; Use configFile() for properties file path
-                             (.configFile builder config)
-                             ;; Use configs() for map of properties
-                             (let [config-map (into {} (for [[k v] config]
-                                                         [(name k) (str v)]))]
-                               (.configs builder config-map)))
-        session (.create configured-builder)]
-    (wrap-session session (merge {:read-key-fn read-key-fn
-                                  :write-key-fn write-key-fn}
-                                 opts))))
+  ([config]
+   (create-session config {}))
+  ([config {:keys [read-key-fn write-key-fn] :or {read-key-fn (:read-key-fn default-opts)
+                                                  write-key-fn (:write-key-fn default-opts)} :as opts}]
+   (let [loaded-config (if (string? config)
+                         (config/read-config config)
+                         config)
+         _ (when-not (m/validate config/config-schema loaded-config)
+             (let [explanation (m/explain config/config-schema loaded-config)]
+               (throw (ex-info (str "Invalid config: " (me/humanize explanation))
+                               {:config loaded-config
+                                :explanation explanation}))))
+         config-map (into {} (for [[k v] loaded-config]
+                               [(name k) ((comp str mask/unmask) v)]))
+         builder (create-session-builder)
+         configured-builder (.configs builder config-map)
+         session (.create configured-builder)]
+     (wrap-session session (merge {:read-key-fn read-key-fn
+                                   :write-key-fn write-key-fn}
+                                  opts)))))
 
 (defn close-session
   "Close a session"

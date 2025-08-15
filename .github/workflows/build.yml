@@ -16,4 +16,5 @@ jobs:
     uses: ./.github/workflows/clojure-deps-build.yml
     with:
       java-version: 11
+      integration: true
     secrets: inherit
