@@ -4,6 +4,7 @@
    [aero.core :as aero]
    [clojure.test :refer [deftest is testing]]
    [malli.generator :as mg]
+   [mask.core :as mask]
    [snowpark-clj.session :as session]
    [spy.assert :as assert]
    [spy.core :as spy]
@@ -13,7 +14,7 @@
 (def test-config
   {:url "jdbc:snowflake://test.snowflakecomputing.com"
    :user "testuser"
-   :password "testpass"})
+   :password (mask/mask "testpass")})
 
 (defprotocol MockSessionBuilder
   (configs [this config-map] "Mock SessionBuilder.configs method")
@@ -95,7 +96,7 @@
                   mock-builder-configured-spies]} (mock-builder)
           mock-config {:url "jdbc:snowflake://test.snowflakecomputing.com"
                        :user "testuser"
-                       :password "testpass"}
+                       :password (mask/mask "testpass")}
           expected-config-map {"url" "jdbc:snowflake://test.snowflakecomputing.com"
                                "user" "testuser"
                                "password" "testpass"}]
@@ -122,15 +123,17 @@
           (assert/called-with? (:configs mock-builder-spies) mock-builder expected-config-map)
           (assert/called-once? (:create mock-builder-configured-spies))))))
 
-  (testing "Create session with missing required keys throws validation error"
-    (let [invalid-config (dissoc (mg/generate session/config-schema) :url)]
-      (is (thrown-with-msg? Exception #"Invalid config"
-                            (session/create-session invalid-config)))))
-
-  (testing "Create session with extra keys throws validation error"
-    (let [invalid-config (assoc (mg/generate session/config-schema) :extra "not-defined-in-schema")]
-      (is (thrown-with-msg? Exception #"Invalid config"
-                            (session/create-session invalid-config)))))
+  (with-redefs [session/create-session-builder (fn [] (:mock-builder (mock-builder)))]
+    
+    (testing "Create session with missing required keys throws validation error"
+      (let [invalid-config (dissoc (mg/generate session/config-schema) :url)]
+        (is (thrown-with-msg? Exception #"Invalid config"
+                              (session/create-session invalid-config)))))
+    
+    (testing "Create session with extra keys throws validation error"
+      (let [invalid-config (assoc (mg/generate session/config-schema) :extra "not-defined-in-schema")]
+        (is (thrown-with-msg? Exception #"Invalid config"
+                              (session/create-session invalid-config))))))
 
   (testing "Create session with nil string keys throws validation error"
     (doseq [config-key [:url :role]]
@@ -141,6 +144,24 @@
   (testing "Create session with empty string keys throws validation error"
     (doseq [config-key [:url :role]]
       (let [invalid-config (assoc (mg/generate session/config-schema) config-key "")]
+        (is (thrown-with-msg? Exception #"Invalid config"
+                              (session/create-session invalid-config))))))
+
+  (testing "Create session with nil masked string keys throws validation? error"
+    (doseq [config-key [:password]]
+      (let [invalid-config (assoc (mg/generate session/config-schema) config-key nil)]
+        (is (thrown-with-msg? Exception #"Invalid config"
+                              (session/create-session invalid-config))))))
+
+  (testing "Create session with empty masked string keys throws validation error"
+    (doseq [config-key [:password]]
+      (let [invalid-config (assoc (mg/generate session/config-schema) config-key (mask/mask ""))]
+        (is (thrown-with-msg? Exception #"Invalid config"
+                              (session/create-session invalid-config))))))
+
+  (testing "Create session with non-masked masked string keys throws validation error"
+    (doseq [config-key [:password]]
+      (let [invalid-config (update (mg/generate session/config-schema) config-key mask/unmask)]
         (is (thrown-with-msg? Exception #"Invalid config"
                               (session/create-session invalid-config)))))))
 

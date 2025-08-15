@@ -1,16 +1,37 @@
 (ns snowpark-clj.session
   "The internal API for Snowpark session functions."
-  (:require [clojure.string :as str]
-            [aero.core :as aero]
-            [malli.core :as m]
-            [malli.error :as me])
-  (:import [com.snowflake.snowpark_java Session]))
+  (:require
+   [aero.core :as aero]
+   [clojure.string :as str]
+   [clojure.test.check.generators :as gen]
+   [malli.core :as m]
+   [malli.error :as me]
+   [malli.registry :as mr]
+   [mask.aero]
+   [mask.core :as mask])
+  (:import
+   [com.snowflake.snowpark_java Session]))
+
+(comment
+  (mask/mask? "x"))
+
+(def mask-schema
+  [:fn {:error/message "must be a non-empty string tagged with #mask"
+        :gen/gen (gen/fmap mask/mask gen/string-alphanumeric)}
+   #(and (mask/mask? %)
+         (string? (mask/unmask %))
+         (not-empty (mask/unmask %)))])
+
+(mr/set-default-registry!
+ (mr/composite-registry
+  (m/default-schemas)
+  {:mask mask-schema}))
 
 (def config-schema
   [:map {:closed true}
    [:url [:string {:min 1}]]
    [:user [:string {:min 1}]]
-   [:password [:string {:min 1}]]
+   [:password :mask]
    [:role {:optional true} [:string {:min 1}]]
    [:warehouse {:optional true} [:string {:min 1}]]
    [:db {:optional true} [:string {:min 1}]]
@@ -63,19 +84,18 @@
    Returns: A session wrapper with the session options"
   ([config]
    (create-session config {}))
-  ([config {:keys [read-key-fn write-key-fn] :or {read-key-fn (:read-key-fn default-opts) 
+  ([config {:keys [read-key-fn write-key-fn] :or {read-key-fn (:read-key-fn default-opts)
                                                   write-key-fn (:write-key-fn default-opts)} :as opts}]
    (let [loaded-config (if (string? config)
                          (aero/read-config config)
                          config)
-         masked-config (dissoc loaded-config :password)
          _ (when-not (m/validate config-schema loaded-config)
-             (let [explanation (m/explain config-schema masked-config)] 
+             (let [explanation (m/explain config-schema loaded-config)]
                (throw (ex-info (str "Invalid config: " (me/humanize explanation))
-                               {:config masked-config
-                                :explanation explanation})))) 
+                               {:config loaded-config
+                                :explanation explanation}))))
          config-map (into {} (for [[k v] loaded-config]
-                               [(name k) (str v)]))
+                               [(name k) ((comp str mask/unmask) v)]))
          builder (create-session-builder)
          configured-builder (.configs builder config-map)
          session (.create configured-builder)]

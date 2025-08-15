@@ -1,6 +1,6 @@
 {:url "https://vkvupnf-yyb56283.snowflakecomputing.com"
  :user "ALZA"
- :password #env "SNOWFLAKE_PASSWORD"
+ :password #mask #env "SNOWFLAKE_PASSWORD"
  :role "SNOWFLAKE_LEARNING_ROLE"
  :warehouse "SNOWFLAKE_LEARNING_WH"
  :db "SNOWFLAKE_LEARNING_DB"
