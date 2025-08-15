@@ -23,11 +23,17 @@ The library should implement the following layers as namespaces:
 - It should provide a create-session function giving two ways to create a session, depending on the type of the mandatory config argument.
 - If the config arg is a string, it is assumed to be the path of an edn file that is expected to conform to a Malli config schema when loaded. The Aero library should be used to load the config, validated with Malli and then passed to SessionBuilder.configs().
 - Otherwise the config arg is assumed to be a map that is expected to conform to a Malli config schema. The config should be validated with Malli and then passed to SessionBuilder.configs().
-- The Malli config schema must correspond to the properties allowed for Snowpark, converted to lower case and keywordized.
 - The create-session function must also provide an optional map argument that can include two options, read-key-fn which is a function to transform column names on dataset read operations, and write-key-fn which is a function to transform column names on dataset write (or create) operations.
 - The default value of read-key-fn will be `(comp keyword str/lower-case)` and the default value of write-key-fn will be `(comp str/upper-case name)`, as in, read-key-fn is the inverse of write-key-fn.
 - Although read-key-fn and write-key-fn are specified by the session, these functions should be passed to the convert layer functions and exclusively used there.
 - The create-session function must return a map wrapping the session and the options.
+
+# Config layer
+- The internal API for the config schema and related functions.
+- The Malli config schema must correspond to the following JDBC connection parameters for Snowpark, converted to lower case and keywordized: url, user and password (required); role, warehouse, db, schema and insecureMode (optional).
+- The config schema must ensure the password is masked.
+- It should provide a function to read the config using the Aero library with the mask.aero namespace already loaded, to ensure any #mask tags are parsed correctly.
+- Any resulting config must mask the password when printed or logged, but unmask the password when configuring the Snowpark session.
 
 # Schema layer
 - The internal API for Snowpark schema functions.
