@@ -5,7 +5,7 @@
    [malli.core :as m]
    [malli.generator :as mg]
    [snowpark-clj.core :as sp]
-   [snowpark-clj.wrapper :as w]))
+   [snowpark-clj.wrapper :as wrapper]))
 
 ;; Test data and schema
 (def test-data
@@ -60,9 +60,9 @@
       ;; Verify DataFrame was created successfully
       (is (some? dataframe))
       (is (map? dataframe))
-      (is (w/unwrap dataframe))
-      (is (w/unwrap-option dataframe :read-key-fn))
-      (is (w/unwrap-option dataframe :write-key-fn))
+      (is (wrapper/unwrap dataframe))
+      (is (wrapper/unwrap-option dataframe :read-key-fn))
+      (is (wrapper/unwrap-option dataframe :write-key-fn))
       
       ;; Check schema
       (let [schema (sp/schema dataframe)]
