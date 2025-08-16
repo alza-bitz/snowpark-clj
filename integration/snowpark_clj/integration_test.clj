@@ -4,8 +4,8 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [malli.core :as m]
    [malli.generator :as mg]
-   [snowpark-clj.core :as sp] 
-   [snowpark-clj.dataframe :as df]))
+   [snowpark-clj.core :as sp]
+   [snowpark-clj.wrapper :as wrapper]))
 
 ;; Test data and schema
 (def test-data
@@ -60,9 +60,9 @@
       ;; Verify DataFrame was created successfully
       (is (some? dataframe))
       (is (map? dataframe))
-      (is (df/unwrap-dataframe dataframe))
-      (is (df/unwrap-option dataframe :read-key-fn))
-      (is (df/unwrap-option dataframe :write-key-fn))
+      (is (wrapper/unwrap dataframe))
+      (is (wrapper/unwrap-option dataframe :read-key-fn))
+      (is (wrapper/unwrap-option dataframe :write-key-fn))
       
       ;; Check schema
       (let [schema (sp/schema dataframe)]

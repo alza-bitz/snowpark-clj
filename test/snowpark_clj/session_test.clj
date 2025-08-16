@@ -5,6 +5,7 @@
    [clojure.test :refer [deftest is testing]]
    [mask.core :as mask]
    [snowpark-clj.session :as session]
+   [snowpark-clj.wrapper :as wrapper]
    [spy.assert :as assert]
    [spy.core :as spy]
    [spy.protocol :as protocol]))
@@ -33,34 +34,17 @@
      :mock-builder-configured mock-configured
      :mock-builder-configured-spies (protocol/spies mock-configured)}))
 
-(deftest test-unwrap-session
-  (testing "Extracting raw session from wrapper"
-    (let [mock-session {:mock true}
-          session-wrapper {:session mock-session :read-key-fn keyword :write-key-fn name}
-          result (session/unwrap-session session-wrapper)]
-      (is (= mock-session result)))))
-
-(deftest test-unwrap-read-key-fn
-  (testing "Extracting read-key-fn from wrapper"
-    (let [custom-read-key-fn keyword
-          session-wrapper {:session {:mock true} :read-key-fn custom-read-key-fn}
-          result (session/unwrap-read-key-fn session-wrapper)]
-      (is (= custom-read-key-fn result)))))
-
-(deftest test-unwrap-write-key-fn
-  (testing "Extracting write-key-fn from wrapper"
-    (let [custom-write-key-fn name
-          session-wrapper {:session {:mock true} :write-key-fn custom-write-key-fn}
-          result (session/unwrap-write-key-fn session-wrapper)]
-      (is (= custom-write-key-fn result)))))
-
 (deftest test-close-session
   (testing "Close session in wrapper"
     (let [close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable
                                    (close [_] (close-spy "close-called")))
-          session-wrapper {:session mock-closeable-session :read-key-fn keyword :write-key-fn name}]
-      (session/close-session session-wrapper)
+          mock-session-wrapper (protocol/mock wrapper/IWrappedSessionOptions
+                                 (unwrap [_] mock-closeable-session))
+          mock-session-wrapper-spies (protocol/spies mock-session-wrapper)]
+          
+      (session/close-session mock-session-wrapper)
+      (assert/called-once? (:unwrap mock-session-wrapper-spies))
       (assert/called-with? close-spy "close-called"))))
 
 (deftest test-create-session
@@ -75,14 +59,11 @@
         (let [result (session/create-session test-config)]
 
           ;; Verify the result is properly wrapped
-          (is (map? result))
-          (is (contains? result :session))
-          (is (contains? result :read-key-fn))
-          (is (contains? result :write-key-fn))
+          (is (wrapper/wrapper? result))
           ;; Check that the functions work correctly, not that they equal specific functions
-          (is (= :test ((:read-key-fn result) "TEST")))
-          (is (= "TEST" ((:write-key-fn result) :test)))
-          (is (= "mock-session" (:session result)))
+          (is (= :test ((wrapper/unwrap-option result :read-key-fn) "TEST")))
+          (is (= "TEST" ((wrapper/unwrap-option result :write-key-fn) :test)))
+          (is (= "mock-session" (wrapper/unwrap result)))
 
           ;; Verify the builder methods were called correctly
           (assert/called-once? (:configs mock-builder-spies))
@@ -104,14 +85,11 @@
         (let [result (session/create-session "test-config.edn")]
 
           ;; Verify the result is properly wrapped
-          (is (map? result))
-          (is (contains? result :session))
-          (is (contains? result :read-key-fn))
-          (is (contains? result :write-key-fn))
+          (is (wrapper/wrapper? result))
           ;; Check that the functions work correctly, not that they equal specific functions
-          (is (= :test ((:read-key-fn result) "TEST")))
-          (is (= "TEST" ((:write-key-fn result) :test)))
-          (is (= "mock-session" (:session result)))
+          (is (= :test ((wrapper/unwrap-option result :read-key-fn) "TEST")))
+          (is (= "TEST" ((wrapper/unwrap-option result :write-key-fn) :test)))
+          (is (= "mock-session" (wrapper/unwrap result)))
 
           (assert/called-once? aero/read-config)
           (assert/called-with? aero/read-config "test-config.edn")
@@ -137,24 +115,30 @@
     (let [executed? (atom false)
           close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable
-                                   (close [_] (close-spy "close-called")))]
-      (with-redefs [session/create-session (fn [_] {:session mock-closeable-session :key-fn identity})]
-        (let [result (session/with-session [sess (session/create-session test-config)]
+                                   (close [_] (close-spy "close-called")))
+          mock-session-wrapper (protocol/mock wrapper/IWrappedSessionOptions
+                                              (unwrap [_] mock-closeable-session))
+          mock-session-wrapper-spies (protocol/spies mock-session-wrapper)]
+      (with-redefs [session/create-session (fn [_] mock-session-wrapper)]
+        (let [result (session/with-session [_ (session/create-session test-config)]
                        (reset! executed? true)
-                       (is (= mock-closeable-session (:session sess)))
                        "test-result")]
           (is (= "test-result" result))))
 
       ;; Verify body was executed and session was closed
       (is @executed?)
+      (assert/called-once? (:unwrap mock-session-wrapper-spies))
       (assert/called-with? close-spy "close-called")))
 
   (testing "With session macro closes session even when exception occurs"
     (let [executed? (atom false)
           close-spy (spy/spy)
           mock-closeable-session (reify java.io.Closeable
-                                   (close [_] (close-spy "close-called")))]
-      (with-redefs [session/create-session (fn [_] {:session mock-closeable-session :key-fn identity})]
+                                   (close [_] (close-spy "close-called")))
+          mock-session-wrapper (protocol/mock wrapper/IWrappedSessionOptions
+                                              (unwrap [_] mock-closeable-session))
+          mock-session-wrapper-spies (protocol/spies mock-session-wrapper)]
+      (with-redefs [session/create-session (fn [_] mock-session-wrapper)]
         (try
           (session/with-session [_ (session/create-session test-config)]
             (reset! executed? true)
@@ -164,4 +148,6 @@
 
       ;; Verify body was executed and session was still closed despite exception
       (is @executed?)
-      (assert/called-with? close-spy "close-called"))))
+      (assert/called-once? (:unwrap mock-session-wrapper-spies))
+      (assert/called-with? close-spy "close-called")))
+  )
