@@ -10,15 +10,6 @@
   (:import
    [com.snowflake.snowpark_java Session]))
 
-(defn- wrap-session
-  "Wrap a Snowpark Session with session options"
-  [session opts]
-  (reify
-      wrapper/IWrappedSessionOptions
-      (unwrap [_] session)
-      (unwrap-option [_ option-key] (get opts option-key))
-      (unwrap-options [_] opts)))
-
 (defn create-session-builder
   "Create a new SessionBuilder instance"
   []
@@ -55,9 +46,9 @@
          builder (create-session-builder)
          configured-builder (.configs builder config-map)
          session (.create configured-builder)]
-     (wrap-session session (merge {:read-key-fn read-key-fn
-                                   :write-key-fn write-key-fn}
-                                  opts)))))
+     (wrapper/wrap-session session (merge {:read-key-fn read-key-fn
+                                           :write-key-fn write-key-fn}
+                                          opts)))))
 
 (defn close-session
   "Close a session"

@@ -34,29 +34,6 @@
      :mock-builder-configured mock-configured
      :mock-builder-configured-spies (protocol/spies mock-configured)}))
 
-(deftest test-wrap-session
-  (testing "Extracting raw session from wrapper"
-    (let [mock-session {:mock true}
-          session-wrapper (#'session/wrap-session mock-session {})
-          result (wrapper/unwrap session-wrapper)]
-      (is (= mock-session result))))
-  (testing "TODO Extracting option from wrapper")
-  (testing "TODO Extracting all options from wrapper"))
-
-;; (deftest test-unwrap-read-key-fn
-;;   (testing "Extracting read-key-fn from wrapper"
-;;     (let [custom-read-key-fn keyword
-;;           session-wrapper {:session {:mock true} :read-key-fn custom-read-key-fn}
-;;           result (session/unwrap-read-key-fn session-wrapper)]
-;;       (is (= custom-read-key-fn result)))))
-
-;; (deftest test-unwrap-write-key-fn
-;;   (testing "Extracting write-key-fn from wrapper"
-;;     (let [custom-write-key-fn name
-;;           session-wrapper {:session {:mock true} :write-key-fn custom-write-key-fn}
-;;           result (session/unwrap-write-key-fn session-wrapper)]
-;;       (is (= custom-write-key-fn result)))))
-
 (deftest test-close-session
   (testing "Close session in wrapper"
     (let [close-spy (spy/spy)
