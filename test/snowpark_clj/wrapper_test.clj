@@ -1,4 +1,4 @@
-(ns snowpark-clj.wrapper-test 
+(ns snowpark-clj.wrapper-test
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
@@ -7,36 +7,31 @@
    [spy.assert :as assert]))
 
 (deftest test-wrap-session
-  (testing "Wrap session"
-    (let [mock-session {:mock true}
-          session-wrapper (wrapper/wrap-session mock-session {})
-          result (wrapper/unwrap session-wrapper)]
-      (is (= mock-session result))))
   
-  (testing "TODO Extracting option from wrapper")
+  (testing "Wrap session for session and dataframe is wrapped"
+    (let [mock-session {:mock true}
+          mock-dataframe {:mock true}]
+      (doseq [wrapper [(wrapper/wrap-session mock-session {:read-key-fn identity})
+                       (wrapper/wrap-dataframe mock-dataframe {:read-key-fn identity})]]
+        (is (wrapper/wrapper? wrapper)))))
 
-  (testing "TODO Extracting all options from wrapper"))
+  (testing "Wrap session for session and dataframe implements IWrappedSessionOptions"
+    (let [mock-session {:mock true}
+          mock-dataframe {:mock true}]
+      (doseq [mock [mock-session mock-dataframe]
+              wrapper [(wrapper/wrap-session mock-session {:read-key-fn identity})
+                       (wrapper/wrap-dataframe mock-dataframe {:read-key-fn identity})]]
 
-;; (deftest test-unwrap-read-key-fn
-;;   (testing "Extracting read-key-fn from wrapper"
-;;     (let [custom-read-key-fn keyword
-;;           session-wrapper {:session {:mock true} :read-key-fn custom-read-key-fn}
-;;           result (session/unwrap-read-key-fn session-wrapper)]
-;;       (is (= custom-read-key-fn result)))))
-
-;; (deftest test-unwrap-write-key-fn
-;;   (testing "Extracting write-key-fn from wrapper"
-;;     (let [custom-write-key-fn name
-;;           session-wrapper {:session {:mock true} :write-key-fn custom-write-key-fn}
-;;           result (session/unwrap-write-key-fn session-wrapper)]
-;;       (is (= custom-write-key-fn result)))))
+        (is (= mock (wrapper/unwrap wrapper)))
+        (is (= identity (wrapper/unwrap-option wrapper :read-key-fn)))
+        (is (= {:read-key-fn identity} (wrapper/unwrap-options wrapper)))))))
 
 (deftest test-wrap-dataframe
   (testing "DataFrame wrapper supports map-like column access (feature 5)"
     (let [{:keys [mock-schema]} (mocks/mock-schema ["NAME" "SALARY" "AGE" "DEPARTMENT" "ID"])
           {:keys [mock-dataframe mock-dataframe-spies]} (mocks/mock-dataframe {:mock-schema mock-schema})
           test-df (wrapper/wrap-dataframe mock-dataframe {:write-key-fn (comp str/upper-case name)
-                                                       :read-key-fn (comp keyword str/lower-case)})]
+                                                          :read-key-fn (comp keyword str/lower-case)})]
 
       (testing "IFn access: (df :column)"
         (let [result (test-df :name)]
