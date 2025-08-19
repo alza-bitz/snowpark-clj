@@ -1,26 +1,17 @@
 (ns snowpark-clj.integration-test
   "Integration tests for the snowpark-clj library"
-  (:require 
+  (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [malli.core :as m]
    [malli.generator :as mg]
    [snowpark-clj.core :as sp]
+   [snowpark-clj.schemas :as schemas]
    [snowpark-clj.wrapper :as wrapper]))
 
 ;; Test data and schema
 (def test-data
-  [{:id 1 :name "Alice" :age 25 :department "Engineering" :salary 70000}
-   {:id 2 :name "Bob" :age 30 :department "Engineering" :salary 80000}
-   {:id 3 :name "Charlie" :age 35 :department "Sales" :salary 60000}])
-
-;; Malli schema for test data (Feature 4)
-(def test-employee-schema
-  (m/schema [:map
-             [:id :int]
-             [:name :string]
-             [:age :int]
-             [:department [:enum "Engineering" "Sales" "Marketing"]]
-             [:salary [:int {:min 50000 :max 100000}]]]))
+  [{:id 1 :name "Alice" :department "Engineering" :salary 70000}
+   {:id 2 :name "Bob" :department "Engineering" :salary 80000}
+   {:id 3 :name "Charlie" :department "Sales" :salary 60000}])
 
 ;; Test fixtures
 (def ^:dynamic *session* nil)
@@ -56,47 +47,42 @@
   (testing "Feature 1: Load Clojure data and save to Snowflake table"
     ;; Create DataFrame from Clojure data
     (let [dataframe (sp/create-dataframe *session* test-data)]
-      
+
       ;; Verify DataFrame was created successfully
       (is (some? dataframe))
       (is (map? dataframe))
       (is (wrapper/unwrap dataframe))
       (is (wrapper/unwrap-option dataframe :read-key-fn))
       (is (wrapper/unwrap-option dataframe :write-key-fn))
-      
+
       ;; Check schema
       (let [schema (sp/schema dataframe)]
         (is (some? schema)))
-      
+
       ;; Check columns
       (let [columns (.names (sp/schema dataframe))]
-        (is (= 5 (count columns)))
-        (is (every? #{"ID" "NAME" "AGE" "DEPARTMENT" "SALARY"} columns)))
-      
+        (is (= 4 (count columns)))
+        (is (every? #{"ID" "NAME" "DEPARTMENT" "SALARY"} columns)))
+
       ;; Save to Snowflake table
       (sp/save-as-table dataframe test-table-name :overwrite)
-      
+
       ;; Verify table was created by reading it back
       (let [table-df (sp/table *session* test-table-name)
-            results (sp/collect table-df)]
-        (is (= 3 (count results)))
-        (is (every? map? results))
-        
-        ;; Verify data integrity
-        (let [sorted-results (sort-by :id results)]
-          (is (= 1 (:id (first sorted-results))))
-          (is (= "Alice" (:name (first sorted-results))))
-          (is (= 25 (:age (first sorted-results))))
-          (is (= "Engineering" (:department (first sorted-results))))
-          (is (= 70000 (:salary (first sorted-results)))))))))
+            result (sp/collect table-df)]
+        (is (= 3 (count result)))
+        (is (every? map? result))
 
-;; Feature 2 Integration Tests  
+        ;; Verify data integrity
+        (is (= (sort-by :id test-data) (sort-by :id result)))))))
+
+;; Feature 2 Integration Tests
 (deftest test-feature-2-read-and-compute
   (testing "Feature 2: Read from table, compute, and collect results"
     ;; First create and save test data (Feature 1)
     (let [dataframe (sp/create-dataframe *session* test-data)]
       (sp/save-as-table dataframe test-table-name :overwrite)
-      
+
       ;; Read from table and apply transformations
       (let [table-df (sp/table *session* test-table-name)
             salary-col (sp/col table-df :salary)
@@ -106,22 +92,21 @@
             sorted-df (sp/sort selected-df [:salary])
             limited-df (sp/limit sorted-df 2)
             results (sp/collect limited-df)]
-        
+
         (is (vector? results))
         (is (<= (count results) 2))
-        
-        ;; Verify data structure (keys should be keywordized due to read-key-fn)
-        (when (seq results)
-          (let [first-row (first results)]
-            (is (map? first-row))
-            (is (contains? first-row :name))  ; Lowercase from read-key-fn conversion
-            (is (contains? first-row :salary)))))
-      
+
+        ;; Verify data integrity
+        (let [expected (transduce (comp (filter #(> (get % :salary) 65000))
+                                        (map #(select-keys % [:name :salary])))
+                                  (completing conj #(sort-by :salary %)) test-data)]
+          (is (= expected results))))
+
       ;; Test other action operations
       (let [table-df (sp/table *session* test-table-name)
             row-count (sp/count table-df)]
         (is (= 3 row-count)))
-       
+
       (let [table-df (sp/table *session* test-table-name)
             sample-rows (sp/take table-df 2)]
         (is (= 2 (count sample-rows)))
@@ -140,38 +125,19 @@
 (deftest test-feature-4-malli-schema-conversion
   (testing "Feature 4: Malli schema to Snowpark schema conversion"
     ;; Convert Malli schema to Snowpark schema
-    (let [snowpark-schema (sp/malli-schema->snowpark-schema *session* test-employee-schema)]
-      (is (some? snowpark-schema))
-
-      ;; Create DataFrame with explicit schema
-      (let [dataframe (sp/create-dataframe *session* test-data snowpark-schema)]
-        (is (some? dataframe))
-        (is (map? dataframe))
-
-        ;; Verify schema matches
-        (let [columns (.names (sp/schema dataframe))]
-          (is (= 5 (count columns)))
-          (is (every? #{"ID" "NAME" "AGE" "DEPARTMENT" "SALARY"} columns)))))
-
-    ;; Test with generated data
-    (let [generated-data (mg/generate [:vector {:gen/min 5 :gen/max 5} test-employee-schema])
-          snowpark-schema (sp/malli-schema->snowpark-schema *session* test-employee-schema)
-          dataframe (sp/create-dataframe *session* generated-data snowpark-schema)]
+    (let [data (mg/generate [:vector {:gen/min 5 :gen/max 5} schemas/employee-schema-with-optional-keys])
+          schema (sp/malli-schema->snowpark-schema *session* schemas/employee-schema-with-optional-keys)
+          dataframe (sp/create-dataframe *session* data schema)]
 
       (is (= 5 (sp/count dataframe)))
 
       ;; Round-trip test: create, collect, and verify data integrity
-      (let [collected-data (sp/collect dataframe)]
-        (is (= 5 (count collected-data)))
-        (is (every? map? collected-data))
+      (let [result (sp/collect dataframe)]
+        (is (= 5 (count result)))
+        (is (every? map? result))
 
-        ;; Verify all required fields are present
-        (doseq [row collected-data]
-          (is (contains? row :id))
-          (is (contains? row :name))
-          (is (contains? row :age))
-          (is (contains? row :department))
-          (is (contains? row :salary)))))))
+        ;; Verify data integrity
+        (is (= (sort-by :id data) (sort-by :id result)))))))
 
 ;; Data Type Conversion Tests
 (deftest test-data-type-conversions
@@ -205,12 +171,10 @@
         (testing "IFn access: (df :column)"
           ;; Test accessing columns using dataframe as a function
           (let [name-col (table-df :name)
-                salary-col (table-df :salary)
-                age-col (table-df :age)]
+                salary-col (table-df :salary)]
             ;; Verify we get Column objects back
             (is (instance? com.snowflake.snowpark_java.Column name-col))
             (is (instance? com.snowflake.snowpark_java.Column salary-col))
-            (is (instance? com.snowflake.snowpark_java.Column age-col))
             
             ;; Test that we can use these columns in queries
             (let [filtered-df (sp/filter table-df (sp/gt salary-col (sp/lit 65000)))
