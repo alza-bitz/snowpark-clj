@@ -21,33 +21,32 @@
 
 (deftest test-infer-schema
   (testing "Infer schema with no optional keys in schema"
-    (let [employees (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema])
+    (let [data (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema])
           write-key-fn (comp str/upper-case name)
           {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
-          schema (schema/infer-schema mock-session-wrapper employees)]
+          result (schema/infer-schema mock-session-wrapper data)]
 
-      (is (some? schema))
-      (is (= 4 (count (.names schema))))
+      (is (some? result))
+      (is (= 4 (count (.names result))))
       (doseq [[expected-name expected-type expected-nullable field]
               (map list
                    ["ID" "NAME" "DEPARTMENT" "SALARY"]
                    [DataTypes/IntegerType DataTypes/StringType DataTypes/StringType DataTypes/IntegerType]
                    (repeat true)
-                   (iterator-seq (.iterator schema)))]
-        
+                   (iterator-seq (.iterator result)))]
         (is (= expected-name (.name field)) (str "Name mismatch for " expected-name))
         (is (= expected-type (.dataType field)) (str "Data type mismatch for field " expected-name))
         (is (= expected-nullable (.nullable field)) (str "Nullable mismatch for field " expected-name)))))
 
   (testing "Infer schema with optional keys present as nil values"
-    (let [employees (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema-with-nil-values])
+    (let [data (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema-with-nil-values])
           write-key-fn (comp str/upper-case name)
           {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
-          schema (schema/infer-schema mock-session-wrapper employees)]
+          result (schema/infer-schema mock-session-wrapper data)]
 
-      (is (some? schema))
-      (is (= 5 (count (.names schema))))
-      (is (= ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"] (vec (.names schema))))))
+      (is (some? result))
+      (is (= 5 (count (.names result))))
+      (is (= ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"] (vec (.names result))))))
 
   (testing "Infer schema with empty collection should throw exception"
     (is (thrown-with-msg? IllegalArgumentException
@@ -58,17 +57,16 @@
   (testing "Create schema from Malli schema with optional keys"
     (let [write-key-fn (comp str/upper-case name)
           {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
-          schema (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema-with-optional-keys)]
+          result (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema-with-optional-keys)]
 
-      (is (some? schema))
-      (is (= 5 (count (.names schema))))
+      (is (some? result))
+      (is (= 5 (count (.names result))))
       (doseq [[expected-name expected-type expected-nullable field]
               (map list
                    ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"]
                    [DataTypes/IntegerType DataTypes/StringType DataTypes/StringType DataTypes/IntegerType DataTypes/IntegerType]
                    [false false false false true]
-                   (iterator-seq (.iterator schema)))]
-
+                   (iterator-seq (.iterator result)))]
         (is (= expected-name (.name field)) (str "Name mismatch for " expected-name))
         (is (= expected-type (.dataType field)) (str "Data type mismatch for " expected-name))
         (is (= expected-nullable (.nullable field)) (str "Nullable mismatch for " expected-name)))))
@@ -94,10 +92,10 @@
 
 ;; Property-based test for schema inference consistency with no optional keys in schema
 (defspec schema-inference-consistency-property 20
-  (prop/for-all [employees (mg/generator [:vector {:gen/min 1 :gen/max 10} schemas/employee-schema])]
+  (prop/for-all [data (mg/generator [:vector {:gen/min 1 :gen/max 10} schemas/employee-schema])]
                 (let [write-key-fn (comp str/upper-case name)
                       {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
-                      inferred-schema (schema/infer-schema mock-session-wrapper employees)
+                      inferred-schema (schema/infer-schema mock-session-wrapper data)
                       converted-schema (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema)]
                   ;; Both schemas should have the same field names in the same order
                   (= (vec (.names inferred-schema)) (vec (.names converted-schema))))))
