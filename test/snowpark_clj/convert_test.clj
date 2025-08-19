@@ -8,9 +8,9 @@
    [malli.core :as m]
    [malli.generator :as mg]
    [snowpark-clj.convert :as convert]
-   [snowpark-clj.mocks :as mocks]
-   [snowpark-clj.schema :as schema]
-   [snowpark-clj.wrapper :as wrapper]))
+   [snowpark-clj.mocks :as mocks]) 
+  (:import
+   [com.snowflake.snowpark_java Row]))
 
 ;; Malli schema based on test_data.csv structure (Feature 4)
 (def employee-schema
@@ -19,6 +19,30 @@
              [:name :string]
              [:department [:enum "Engineering" "Marketing" "Sales"]]
              [:salary [:int {:min 50000 :max 100000}]]]))
+
+(def employee-schema-with-optional-keys
+  (m/schema [:map
+             [:id :int]
+             [:name :string] 
+             [:department [:enum "Engineering" "Marketing" "Sales"]]
+             [:salary [:int {:min 50000 :max 100000}]]
+             [:age {:optional true} :int]]))
+
+(def employee-schema-with-nil-values
+  (m/schema [:map
+             [:id :int]
+             [:name :string] 
+             [:department [:enum "Engineering" "Marketing" "Sales"]]
+             [:salary [:int {:min 50000 :max 100000}]]
+             [:age :nil]]))
+
+(def employee-schema-with-maybe-nil-values
+  (m/schema [:map
+             [:id :int]
+             [:name :string]
+             [:department [:enum "Engineering" "Marketing" "Sales"]]
+             [:salary [:int {:min 50000 :max 100000}]]
+             [:age [:or int? nil?]]]))
 
 (deftest test-clojure-value->java
   (testing "Converting Clojure values to Java types"
@@ -29,125 +53,130 @@
     (is (= 42 (convert/clojure-value->java 42)))
     (is (= true (convert/clojure-value->java true)))
     (is (nil? (convert/clojure-value->java nil))))
-  
+
   (testing "Edge cases"
     (is (= "" (convert/clojure-value->java (keyword ""))))
     (is (= "some-keyword" (convert/clojure-value->java :some-keyword)))))
 
 (deftest test-map->row
-  (testing "Converting map to row with generated data"
-    (let [employee (mg/generate employee-schema {:size 10})
+  (testing "Converting map to row with no optional keys in schema"
+    (let [employee (mg/generate employee-schema)
           write-key-fn (comp str/upper-case name)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
           row (convert/map->row employee mock-schema write-key-fn)]
-      
+
       (is (some? row))
       (is (instance? com.snowflake.snowpark_java.Row row))
-      
-      ;; Test that we can get values back from the row
-      (is (= (:id employee) (.get row 0)))
-      (is (= (:name employee) (.get row 1)))
-      (is (= (:department employee) (.get row 2)))
-      (is (= (:salary employee) (.get row 3)))))
-  
-  (testing "Converting map with keyword keys"
-    (let [test-map {:id 1 :name "Alice" :department "Engineering" :salary 75000}
+      (is (= 4 (.size row)))
+      (doseq [[key index] (map list [:id :name :department :salary] (range))]
+        (is (= (get employee key) (.get row index)) (str "Value mismatch for " key)))))
+
+  (testing "Converting map to row with optional keys missing"
+    (let [employee (mg/generate employee-schema)
           write-key-fn (comp str/upper-case name)
-          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
-          row (convert/map->row test-map mock-schema write-key-fn)]
-      
+          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
+          row (convert/map->row employee mock-schema write-key-fn)]
+
       (is (some? row))
-      (is (= 1 (.get row 0)))
-      (is (= "Alice" (.get row 1))))))
+      (is (instance? com.snowflake.snowpark_java.Row row))
+      (is (= 5 (.size row)))
+      (doseq [[key index] (map list [:id :name :department :salary :age] (range))]
+        (is (= (get employee key) (.get row index)) (str "Value mismatch for " key)))))
+  
+  (testing "Converting map to row with optional keys present as nil values"
+    (let [employee (mg/generate employee-schema-with-nil-values)
+          write-key-fn (comp str/upper-case name)
+          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
+          row (convert/map->row employee mock-schema write-key-fn)]
+    
+      (is (some? row))
+      (is (instance? com.snowflake.snowpark_java.Row row))
+      (is (= 5 (.size row)))
+      (doseq [[key index] (map list [:id :name :department :salary :age] (range))]
+        (is (= (get employee key) (.get row index)) (str "Value mismatch for " key)))))
+  
+  (testing "Converting map to row with extra keys not in schema"
+    (let [employee (mg/generate employee-schema)
+          write-key-fn (comp str/upper-case name)
+          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
+          row (convert/map->row (assoc employee :extra "not-in-schema") mock-schema write-key-fn)]
+    
+      (is (some? row))
+      (is (instance? com.snowflake.snowpark_java.Row row))
+      (is (= 5 (.size row))))))
 
 (deftest test-maps->rows
-  (testing "Converting multiple maps to rows array with generated data"
-    (let [employees (mg/generate [:vector {:gen/min 2 :gen/max 5} employee-schema] {:size 10})
-          write-key-fn (comp str/upper-case name) 
-          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
-          rows-array (convert/maps->rows employees mock-schema write-key-fn)]
-      
-      (is (some? rows-array))
-      (is (= (count employees) (count rows-array)))
-      (is (every? #(instance? com.snowflake.snowpark_java.Row %) rows-array))
-      
-      ;; Test that first row matches first employee
-      (let [first-row (first rows-array)
-            first-employee (first employees)]
-        (is (= (:id first-employee) (.get first-row 0)))
-        (is (= (:name first-employee) (.get first-row 1)))))))
+  (testing "Converting maps to rows with optional keys either present or missing"
+    (let [employees (mg/generate [:vector {:gen/min 2 :gen/max 5} employee-schema-with-optional-keys])
+          write-key-fn (comp str/upper-case name)
+          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
+          rows (convert/maps->rows employees mock-schema write-key-fn)]
+
+      (is (some? rows))
+      (is (= (count employees) (count rows)))
+      (is (every? #(instance? com.snowflake.snowpark_java.Row %) rows))
+      (is (every? #(= 5 (.size %)) rows)))))
 
 (deftest test-row->map
-  (testing "Converting Row to map using real Snowpark objects with generated data"
-    (let [employee (mg/generate employee-schema {:size 10})
-          write-key-fn (comp str/upper-case name)
+  (testing "Converting row to map with non-null values for all schema fields"
+    (let [employee (mg/generate employee-schema)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
-          row (convert/map->row employee mock-schema write-key-fn)
+          row (Row/create (into-array Object (vals employee)))
+          result (convert/row->map row mock-schema (comp keyword str/lower-case))]
+
+      (is (map? result))
+      (is (= 4 (count result)))
+      (is (= (keys employee) (keys result)))
+      (is (= employee result))))
+
+  (testing "Converting row to map with null values for nullable fields"
+    (let [employee (mg/generate employee-schema-with-nil-values)
+          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
+          row (Row/create (into-array Object (vals employee)))
           result (convert/row->map row mock-schema (comp keyword str/lower-case))]
       
       (is (map? result))
       (is (= 4 (count result)))
-      (is (= (:id employee) (:id result)))
-      (is (= (:name employee) (:name result)))
-      (is (= (:department employee) (:department result)))
-      (is (= (:salary employee) (:salary result)))))
-  
-  (testing "Row to map conversion with different key decoding functions"
-    (let [test-map {:id 1 :name "Alice" :department "Engineering" :salary 75000}
-          write-key-fn (comp str/upper-case name)
-          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
-          row (convert/map->row test-map mock-schema write-key-fn)
-          result (convert/row->map row mock-schema (comp keyword str/lower-case))]
-      
-      (is (map? result))
-      (is (= 4 (count result)))
-      (is (= 1 (:id result)))
-      (is (= "Alice" (:name result)))
-      (is (= "Engineering" (:department result)))
-      (is (= 75000 (:salary result))))))
+      (is (= (keys (dissoc employee :age)) (keys result)))
+      (is (= (dissoc employee :age) result)))))
 
 (deftest test-rows->maps
-  (testing "Converting collection of Rows to vector of maps with generated data"
-    (let [employees (mg/generate [:vector {:gen/min 2 :gen/max 5} employee-schema] {:size 10})
-          write-key-fn (comp str/upper-case name)
-          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
-          rows-array (convert/maps->rows employees mock-schema write-key-fn)
-          result-maps (convert/rows->maps rows-array mock-schema (comp keyword str/lower-case))]
-      
-      (is (vector? result-maps))
-      (is (= (count employees) (count result-maps)))
-      (is (every? map? result-maps))
-      
-      ;; Test that the conversion is round-trip safe
-      (is (= (set (map :id employees)) (set (map :id result-maps))))
-      (is (= (set (map :name employees)) (set (map :name result-maps)))))))
+  (testing "Converting rows to maps with with null or non-null values for nullable fields"
+    (let [employees (mg/generate [:vector {:gen/min 2 :gen/max 5} employee-schema-with-maybe-nil-values] {:size 10})
+          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
+          rows (into-array Row (mapv #(Row/create (into-array Object (vals %))) employees))
+          result (convert/rows->maps rows mock-schema (comp keyword str/lower-case))]
+
+      (is (vector? result))
+      (is (= (count employees) (count result)))
+      (is (every? map? result))
+      (is (every? #(or (= 4 (count %)) (= 5 (count %))) result)))))
 
 ;; =============================================================================
 ;; Property-based tests
 ;; =============================================================================
 
 ;; Property-based round-trip test (Feature 4)
-(defspec roundtrip-malli-schema-property 20
-  (prop/for-all [employees (mg/generator [:vector {:gen/max 10} employee-schema] {:size 10})]
-    (let [write-key-fn (comp str/upper-case name)
-          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
-          rows (convert/maps->rows employees mock-schema write-key-fn)]
-      (= employees (convert/rows->maps rows mock-schema (comp keyword str/lower-case))))))
+(defspec maps-rows-roundtrip-property 20
+  (prop/for-all [employees (mg/generator [:vector {:gen/max 10} employee-schema-with-optional-keys])]
+                (let [write-key-fn (comp str/upper-case name)
+                      {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
+                      rows (convert/maps->rows employees mock-schema write-key-fn)]
+                  (= employees (convert/rows->maps rows mock-schema (comp keyword str/lower-case))))))
 
 ;; Property-based test for individual map/row conversion
 (defspec map-row-roundtrip-property 20
-  (prop/for-all [employee (mg/generator employee-schema {:size 10})]
-    (let [write-key-fn (comp str/upper-case name)
-          {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
-          row (convert/map->row employee mock-schema write-key-fn)
-          result (convert/row->map row mock-schema (comp keyword str/lower-case))]
-      (= employee result))))
+  (prop/for-all [employee (mg/generator employee-schema-with-optional-keys)]
+                (let [write-key-fn (comp str/upper-case name)
+                      {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
+                      row (convert/map->row employee mock-schema write-key-fn)]
+                  (= employee (convert/row->map row mock-schema (comp keyword str/lower-case))))))
 
 ;; Property-based test for clojure-value->java conversion
 (defspec clojure-value-conversion-property 20
   (prop/for-all [value (mg/generator [:or :int :string :boolean :keyword :symbol] {:size 10})]
-    (let [result (convert/clojure-value->java value)]
-      (cond
-        (keyword? value) (= result (name value))
-        (symbol? value) (= result (name value))
-        :else (= result value)))))
+                (let [result (convert/clojure-value->java value)]
+                  (cond
+                    (keyword? value) (= result (name value))
+                    (symbol? value) (= result (name value))
+                    :else (= result value)))))

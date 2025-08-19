@@ -44,7 +44,7 @@
           (for [i (range field-count)
                 :let [field-name (nth field-names i)
                       value (.get row i)]]
-            [(read-key-fn field-name) value]))))
+            (when value [(read-key-fn field-name) value])))))
 
 (defn rows->maps
   "Convert a collection of Snowpark Rows to a vector of maps"

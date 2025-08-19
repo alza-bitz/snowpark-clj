@@ -38,7 +38,9 @@ The library should implement the following layers as namespaces:
 # Schema layer
 - The internal API for Snowpark schema functions.
 - It should include a function for inferring a Snowpark schema from a coll of Clojure maps and a wrapped session providing write-key-fn.
+- When inferring a schema, map keys must result in a StructField with nullable=true, regardless of the value.
 - It should include a function for creating a Snowpark schema from a Malli schema and a wrapped session providing write-key-fn.
+- When creating a schema from a Malli schema, required keys must result in a StructField with nullable=false, and optional keys must result in a StructField with nullable=true.
 - All schema field name conversions must be done with read-key-fn and write-key-fn functions only.
 
 # Dataframe layer
@@ -64,10 +66,12 @@ The library should implement the following layers as namespaces:
 
 # Convert layer
 - The internal API for data conversion functions.
-- It should include functions for converting data from Clojure to Snowpark and back again.
+- It should include functions for converting data from Clojure maps to Snowpark rows and back again.
 - All conversion functions must take read-key-fn or write-key-fn args as appropriate and use those functions when converting.
 - All table column name conversions must be done with read-key-fn and write-key-fn functions only.
 - The read-key-fn and write-key-fn args are required, not optional, so they don't need to be defaulted.
+- When converting from maps to rows, it must handle nullable fields by including a nil value for the column index.
+- When converting from rows to maps, it must handle nullable fields by excluding the key for the column index.
 
 # References to similar projects for inspiration
 - Geni, a Clojure wrapper for Spark Dataframes: https://github.com/zero-one-group/geni
