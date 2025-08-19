@@ -7,42 +7,11 @@
    [malli.core :as m]
    [malli.generator :as mg]
    [snowpark-clj.schema :as schema]
+   [snowpark-clj.schemas :as schemas]
    [snowpark-clj.wrapper :as wrapper]
    [spy.protocol :as protocol])
   (:import
    [com.snowflake.snowpark_java.types DataTypes]))
-
-;; Malli schema based on test_data.csv structure (Feature 4)
-(def employee-schema
-  (m/schema [:map
-             [:id :int]
-             [:name :string]
-             [:department [:enum "Engineering" "Marketing" "Sales"]]
-             [:salary [:int {:min 50000 :max 100000}]]]))
-
-(def employee-schema-with-optional-keys
-  (m/schema [:map
-             [:id :int]
-             [:name :string]
-             [:department [:enum "Engineering" "Marketing" "Sales"]]
-             [:salary [:int {:min 50000 :max 100000}]]
-             [:age {:optional true} :int]]))
-
-(def employee-schema-with-nil-values
-  (m/schema [:map
-             [:id :int]
-             [:name :string]
-             [:department [:enum "Engineering" "Marketing" "Sales"]]
-             [:salary [:int {:min 50000 :max 100000}]]
-             [:age :nil]]))
-
-(def employee-schema-with-maybe-nil-values
-  (m/schema [:map
-             [:id :int]
-             [:name :string]
-             [:department [:enum "Engineering" "Marketing" "Sales"]]
-             [:salary [:int {:min 50000 :max 100000}]]
-             [:age [:or int? nil?]]]))
 
 (defn- mock-session-wrapper [write-key-fn]
   (let [mock (protocol/mock wrapper/IWrappedSessionOptions
@@ -52,7 +21,7 @@
 
 (deftest test-infer-schema
   (testing "Infer schema with no optional keys in schema"
-    (let [employees (mg/generate [:vector {:gen/min 1 :gen/max 5} employee-schema])
+    (let [employees (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema])
           write-key-fn (comp str/upper-case name)
           {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
           schema (schema/infer-schema mock-session-wrapper employees)]
@@ -71,7 +40,7 @@
         (is (= expected-nullable (.nullable field)) (str "Nullable mismatch for field " expected-name)))))
 
   (testing "Infer schema with optional keys present as nil values"
-    (let [employees (mg/generate [:vector {:gen/min 1 :gen/max 5} employee-schema-with-nil-values])
+    (let [employees (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema-with-nil-values])
           write-key-fn (comp str/upper-case name)
           {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
           schema (schema/infer-schema mock-session-wrapper employees)]
@@ -89,7 +58,7 @@
   (testing "Create schema from Malli schema with optional keys"
     (let [write-key-fn (comp str/upper-case name)
           {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
-          schema (schema/malli-schema->snowpark-schema mock-session-wrapper employee-schema-with-optional-keys)]
+          schema (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema-with-optional-keys)]
 
       (is (some? schema))
       (is (= 5 (count (.names schema))))
@@ -121,14 +90,14 @@
           {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)]
       (is (thrown-with-msg? IllegalArgumentException
                           #"Unsupported schema"
-                          (schema/malli-schema->snowpark-schema mock-session-wrapper employee-schema-with-maybe-nil-values))))))
+                          (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema-with-maybe-nil-values))))))
 
 ;; Property-based test for schema inference consistency with no optional keys in schema
 (defspec schema-inference-consistency-property 20
-  (prop/for-all [employees (mg/generator [:vector {:gen/min 1 :gen/max 10} employee-schema])]
+  (prop/for-all [employees (mg/generator [:vector {:gen/min 1 :gen/max 10} schemas/employee-schema])]
                 (let [write-key-fn (comp str/upper-case name)
                       {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
                       inferred-schema (schema/infer-schema mock-session-wrapper employees)
-                      converted-schema (schema/malli-schema->snowpark-schema mock-session-wrapper employee-schema)]
+                      converted-schema (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema)]
                   ;; Both schemas should have the same field names in the same order
                   (= (vec (.names inferred-schema)) (vec (.names converted-schema))))))

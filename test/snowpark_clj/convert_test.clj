@@ -5,44 +5,12 @@
    [clojure.test :refer [deftest is testing]]
    [clojure.test.check.clojure-test :refer [defspec]]
    [clojure.test.check.properties :as prop]
-   [malli.core :as m]
    [malli.generator :as mg]
    [snowpark-clj.convert :as convert]
-   [snowpark-clj.mocks :as mocks]) 
+   [snowpark-clj.mocks :as mocks]
+   [snowpark-clj.schemas :as schemas])
   (:import
    [com.snowflake.snowpark_java Row]))
-
-;; Malli schema based on test_data.csv structure (Feature 4)
-(def employee-schema
-  (m/schema [:map
-             [:id :int]
-             [:name :string]
-             [:department [:enum "Engineering" "Marketing" "Sales"]]
-             [:salary [:int {:min 50000 :max 100000}]]]))
-
-(def employee-schema-with-optional-keys
-  (m/schema [:map
-             [:id :int]
-             [:name :string] 
-             [:department [:enum "Engineering" "Marketing" "Sales"]]
-             [:salary [:int {:min 50000 :max 100000}]]
-             [:age {:optional true} :int]]))
-
-(def employee-schema-with-nil-values
-  (m/schema [:map
-             [:id :int]
-             [:name :string] 
-             [:department [:enum "Engineering" "Marketing" "Sales"]]
-             [:salary [:int {:min 50000 :max 100000}]]
-             [:age :nil]]))
-
-(def employee-schema-with-maybe-nil-values
-  (m/schema [:map
-             [:id :int]
-             [:name :string]
-             [:department [:enum "Engineering" "Marketing" "Sales"]]
-             [:salary [:int {:min 50000 :max 100000}]]
-             [:age [:or int? nil?]]]))
 
 (deftest test-clojure-value->java
   (testing "Converting Clojure values to Java types"
@@ -60,7 +28,7 @@
 
 (deftest test-map->row
   (testing "Converting map to row with no optional keys in schema"
-    (let [employee (mg/generate employee-schema)
+    (let [employee (mg/generate schemas/employee-schema)
           write-key-fn (comp str/upper-case name)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
           row (convert/map->row employee mock-schema write-key-fn)]
@@ -72,7 +40,7 @@
         (is (= (get employee key) (.get row index)) (str "Value mismatch for " key)))))
 
   (testing "Converting map to row with optional keys missing"
-    (let [employee (mg/generate employee-schema)
+    (let [employee (mg/generate schemas/employee-schema)
           write-key-fn (comp str/upper-case name)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
           row (convert/map->row employee mock-schema write-key-fn)]
@@ -84,7 +52,7 @@
         (is (= (get employee key) (.get row index)) (str "Value mismatch for " key)))))
   
   (testing "Converting map to row with optional keys present as nil values"
-    (let [employee (mg/generate employee-schema-with-nil-values)
+    (let [employee (mg/generate schemas/employee-schema-with-nil-values)
           write-key-fn (comp str/upper-case name)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
           row (convert/map->row employee mock-schema write-key-fn)]
@@ -96,7 +64,7 @@
         (is (= (get employee key) (.get row index)) (str "Value mismatch for " key)))))
   
   (testing "Converting map to row with extra keys not in schema"
-    (let [employee (mg/generate employee-schema)
+    (let [employee (mg/generate schemas/employee-schema)
           write-key-fn (comp str/upper-case name)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
           row (convert/map->row (assoc employee :extra "not-in-schema") mock-schema write-key-fn)]
@@ -107,7 +75,7 @@
 
 (deftest test-maps->rows
   (testing "Converting maps to rows with optional keys either present or missing"
-    (let [employees (mg/generate [:vector {:gen/min 2 :gen/max 5} employee-schema-with-optional-keys])
+    (let [employees (mg/generate [:vector {:gen/min 2 :gen/max 5} schemas/employee-schema-with-optional-keys])
           write-key-fn (comp str/upper-case name)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
           rows (convert/maps->rows employees mock-schema write-key-fn)]
@@ -119,7 +87,7 @@
 
 (deftest test-row->map
   (testing "Converting row to map with non-null values for all schema fields"
-    (let [employee (mg/generate employee-schema)
+    (let [employee (mg/generate schemas/employee-schema)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY"])
           row (Row/create (into-array Object (vals employee)))
           result (convert/row->map row mock-schema (comp keyword str/lower-case))]
@@ -130,7 +98,7 @@
       (is (= employee result))))
 
   (testing "Converting row to map with null values for nullable fields"
-    (let [employee (mg/generate employee-schema-with-nil-values)
+    (let [employee (mg/generate schemas/employee-schema-with-nil-values)
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
           row (Row/create (into-array Object (vals employee)))
           result (convert/row->map row mock-schema (comp keyword str/lower-case))]
@@ -142,7 +110,7 @@
 
 (deftest test-rows->maps
   (testing "Converting rows to maps with with null or non-null values for nullable fields"
-    (let [employees (mg/generate [:vector {:gen/min 2 :gen/max 5} employee-schema-with-maybe-nil-values] {:size 10})
+    (let [employees (mg/generate [:vector {:gen/min 2 :gen/max 5} schemas/employee-schema-with-maybe-nil-values] {:size 10})
           {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
           rows (into-array Row (mapv #(Row/create (into-array Object (vals %))) employees))
           result (convert/rows->maps rows mock-schema (comp keyword str/lower-case))]
@@ -158,7 +126,7 @@
 
 ;; Property-based round-trip test (Feature 4)
 (defspec maps-rows-roundtrip-property 20
-  (prop/for-all [employees (mg/generator [:vector {:gen/max 10} employee-schema-with-optional-keys])]
+  (prop/for-all [employees (mg/generator [:vector {:gen/max 10} schemas/employee-schema-with-optional-keys])]
                 (let [write-key-fn (comp str/upper-case name)
                       {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
                       rows (convert/maps->rows employees mock-schema write-key-fn)]
@@ -166,7 +134,7 @@
 
 ;; Property-based test for individual map/row conversion
 (defspec map-row-roundtrip-property 20
-  (prop/for-all [employee (mg/generator employee-schema-with-optional-keys)]
+  (prop/for-all [employee (mg/generator schemas/employee-schema-with-optional-keys)]
                 (let [write-key-fn (comp str/upper-case name)
                       {:keys [mock-schema]} (mocks/mock-schema ["ID" "NAME" "DEPARTMENT" "SALARY" "AGE"])
                       row (convert/map->row employee mock-schema write-key-fn)]
