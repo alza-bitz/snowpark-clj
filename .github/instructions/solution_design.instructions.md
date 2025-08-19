@@ -2,11 +2,6 @@
 applyTo: '**'
 ---
 
-We are a Clojure wrapper for an existing Java API, so:
-
-1. To aid those who are familiar with Snowflake and the Snowpark API, we should present the same concepts (session, dataframe, etc).
-2. To aid those who are familiar with Clojure, the external API should be idiomatic Clojure.
-
 The library should implement the following layers as namespaces:
 
 # Core layer
@@ -55,8 +50,8 @@ The library should implement the following layers as namespaces:
 - Any functions wrapping Snowpark methods that only take one or more column object args, e.g. filter(..), sort(..), must be consistent in what will be accepted: either column objects that will be passed to the wrapped method, or values that will be given to write-key-fn and column objects created, before calling the wrapped method.
 - Any functions wrapping Snowpark methods that take either string column name or column object args, e.g. select(..), groupBy(..), must be consistent in what will be accepted: either column objects that will be passed to the wrapped method, or values that will be given to write-key-fn before calling the wrapped method.
 - All functions must be implemented without using string SQL expressions where possible.
-- Any functions wrapping Snowpark dataframe creation methods must return a map wrapping the dataframe and the options from the session wrapper argument.
-- Any functions wrapping Snowpark eager transformation methods must return a map wrapping the dataframe and the options from the dataframe wrapper argument.
+- Any functions wrapping Snowpark dataframe creation methods must return a map wrapping the dataframe and the options from the session wrapper.
+- Any functions wrapping Snowpark eager transformation methods must return a map wrapping the dataframe and the options from the dataframe wrapper.
 - Function names must be prefixed with df- when the names would otherwise collide with Clojure core.
 
 # Functions layer
@@ -82,12 +77,13 @@ The library should implement the following layers as namespaces:
 - Don't create any namespaces with the same name.
 - Don't create any code that leaves unused vars.
 - Don't create any code with redundant let expressions.
-- Use log4j2 for the logging implementation, and org.clojure/tools.logging for the logging api.
+- Use the slf4j simplelogger for the logging implementation, since this is already used by the Snowpark Java API.
+- Use org.clojure/tools.logging for the logging api.
 
 # All layers: all tests
 - When implementing features 1 & 2, use the schema suggested by test_data.csv as the schema for all the tests.
 - When implementing feature 3 onwards, create a Malli schema based on test_data.csv and use that to generate test data.
-- Since we are using Malli for this solution, use Malli for all generation of test data, rather than clojure.test.check or Clojure spec.
+- Since we are using Malli for this solution, use Malli for all generation of test data, rather than clojure.test.check.
 
 # All layers: unit tests
 - We only need to mock the Snowpark API when it would otherwise need a connection to a Snowflake instance, e.g. when creating a session or calling an (eager) Snowpark action on a dataframe. In all other cases, we can just make the Snowpark API calls directly without mocking.
@@ -95,8 +91,11 @@ The library should implement the following layers as namespaces:
 - If real column objects are required by the function under test, they can be created using Functions.col(..).
 
 # All layers: integration tests
-- The integration tests must verify each feature using the public API, so the external core namespace should be used instead of the other internal namespaces directly.
-- Every feature under test should have a single test named `test-feature-n-<description>`.
-- For each feature under test, different test scenarios such as success and failure can be accommodated by using the `testing` macro from clojure.test.
-- Use test fixtures to create a session and load test data to a temporary Snowflake table using dataframe/save-as-table before running each test, and to delete any temporary tables afterwards
-- Use my trial Snowflake account by creating a session with the supplied snowflake.properties file.
+- Use test fixtures to create a session before running each test and to ensure any tables saved by tests are deleted after each test.
+- For tests that depend on test data in a Snowflake table, use a test fixture to load the test data using dataframe/save-as-table before running all tests and to ensure the table is deleted after all tests.
+- Use my trial Snowflake account by creating a session with a snowflake.edn file.
+
+# All layers: uat tests
+- Every feature from the requirements instructions should have a single test named `test-feature-n-<description>`.
+- These tests must use the external API, as in the core namespace and not the other internal namespaces directly.
+- Use test fixtures and my trial Snowflake account as per the instructions written above for integration tests.

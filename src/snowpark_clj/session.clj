@@ -54,16 +54,3 @@
   "Close a session"
   [session-wrapper]
   (.close (wrapper/unwrap session-wrapper)))
-
-(defmacro with-session
-  "Execute body with a session, automatically closing when done.
-   
-   Usage:
-   (with-session [session (create-session config key-fn)]
-     (do-something-with session))"
-  [[binding session-expr] & body]
-  `(let [~binding ~session-expr]
-     (try
-       ~@body
-       (finally
-         (close-session ~binding)))))

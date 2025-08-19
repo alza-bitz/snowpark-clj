@@ -4,9 +4,10 @@
    [clojure.test :refer [deftest is testing]]
    [snowpark-clj.mocks :as mocks]
    [snowpark-clj.wrapper :as wrapper]
-   [spy.assert :as assert]))
+   [spy.assert :as assert]
+   [spy.core :as spy]))
 
-(deftest test-wrap-session
+(deftest test-wrap
   
   (testing "Wrap session for session and dataframe is wrapped"
     (let [mock-session {:mock true}
@@ -25,6 +26,35 @@
         (is (= mock (wrapper/unwrap wrapper)))
         (is (= identity (wrapper/unwrap-option wrapper :read-key-fn)))
         (is (= {:read-key-fn identity} (wrapper/unwrap-options wrapper)))))))
+
+(deftest test-wrap-session
+  (testing "With open macro executes body and closes session"
+    (let [executed? (atom false)
+          close-spy (spy/spy)
+          mock-session (reify java.io.Closeable (close [_] (close-spy "close-called")))]
+      (let [result (with-open [_ (wrapper/wrap-session mock-session {})]
+                     (reset! executed? true)
+                     "test-result")]
+        (is (= "test-result" result)))
+
+      ;; Verify body was executed and session was closed
+      (is @executed?)
+      (assert/called-with? close-spy "close-called")))
+
+  (testing "With open macro closes session even when exception occurs"
+    (let [executed? (atom false)
+          close-spy (spy/spy)
+          mock-session (reify java.io.Closeable (close [_] (close-spy "close-called")))]
+      (try
+        (with-open [_ (wrapper/wrap-session mock-session {})]
+          (reset! executed? true)
+          (throw (RuntimeException. "test exception")))
+        (catch RuntimeException e
+          (is (= "test exception" (.getMessage e)))))
+
+      ;; Verify body was executed and session was still closed despite exception
+      (is @executed?)
+      (assert/called-with? close-spy "close-called"))))
 
 (deftest test-wrap-dataframe
   (testing "DataFrame wrapper supports map-like column access (feature 5)"

@@ -12,8 +12,7 @@
 (import-vars
   [snowpark-clj.session
    create-session
-   close-session
-   with-session]
+   close-session]
  
   [snowpark-clj.schema
    malli-schema->snowpark-schema]

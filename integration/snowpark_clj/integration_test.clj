@@ -115,8 +115,8 @@
 ;; Feature 3 Integration Tests (Session Macros)
 (deftest test-feature-3-session-macros
   (testing "Feature 3: Session macros work correctly"
-    ;; Test with-session macro
-    (let [result (sp/with-session [session (sp/create-session "integration/snowflake.edn")]
+    ;; Test with-open macro
+    (let [result (with-open [session (sp/create-session "integration/snowflake.edn")]
                    (let [df (sp/create-dataframe session test-data)]
                      (sp/count df)))]
       (is (= 3 result)))))

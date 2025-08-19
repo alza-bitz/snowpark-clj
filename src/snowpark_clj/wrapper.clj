@@ -12,7 +12,7 @@
   (satisfies? IWrappedSessionOptions obj))
 
 (defn wrap-session
-  "Wrap a Snowpark Session with session options"
+  "Wrap a Snowpark Session with session options and java.io.Closeable"
   [session opts]
   (let [base-map (merge {:session session} opts)]
     (reify
@@ -32,7 +32,11 @@
       IWrappedSessionOptions
       (unwrap [_] (:session base-map))
       (unwrap-option [_ option-key] (get base-map option-key))
-      (unwrap-options [_] (dissoc base-map :session)))))
+      (unwrap-options [_] (dissoc base-map :session))
+      
+      java.io.Closeable
+      (close [_]
+        (.close (:session base-map))))))
 
 (defn wrap-dataframe
   "Wrap a Snowpark DataFrame with session options and map-like column access"

@@ -6,14 +6,20 @@ applyTo: '**'
 
 ## Summary
 
-Although the Snowpark library has Java/Scala bindings, it doesn't provide any Clojure wrapper. As such, it's currently not possible to interact with Snowflake using the Clojure way. It would be useful if such a wrapper existed, to enable all kinds of Snowflake use cases directly from the Clojure REPL.
+Although the Snowpark library has Java and Scala bindings, it doesn't provide anything for Clojure. As such, it's currently not possible to interact with Snowflake using the Clojure way. It would be useful if such a wrapper existed, to enable all kinds of Snowflake use cases directly from the Clojure REPL.
 
 ## Global requirements
+As a Clojure wrapper for an existing Java API:
+1. To aid those who are familiar with Snowflake and the Snowpark API, the same concepts should be presented (session, dataframe, etc).
+2. To aid those who are familiar with Clojure, the external API should be idiomatic Clojure.
+
+## Snowpark considerations
+- Snowpark sessions appear to be thread-local, as in, creating a session on a thread that already has a session bound will have it's session replaced by the new session.
 - Snowpark operations are either transformations (lazy) or actions (eager).
-- Transformation operations defer computation until some (eager) action operation is called e.g. collect().
+- Snowpark transformations defer computation until some (eager) action is called e.g. collect().
 - Snowpark dataframes are immutable.
 - The com.snowflake.snowpark_java package contains the main classes for the Snowpark API.
-- The com.snowflake.snowpark_java.types package defines classes that you can use to define schemas.
+- The com.snowflake.snowpark_java.types package contains classes for defining schemas.
 
 ## Feature 1 - Load Clojure data from local and save to a Snowflake table
 
@@ -35,7 +41,7 @@ Although the Snowpark library has Java/Scala bindings, it doesn't provide any Cl
 ## Feature 3 - Session macros
 
 ### Requirements
-- Add a with-session macro that binds a named session to the result of the build function and executes the body with the bound session, much like the let macro, but it also closes the session after the body has been evaluated.
+- Make the session wrapper implement java.io.Closeable so that the with-open macro can be used with the result of create-session and ensure the session is closed after the body has been evaluated.
 
 ## Feature 4 - Convert Malli schemas to Snowpark schemas
 
@@ -58,17 +64,16 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 - As per feature 2 except at step 4, transform the result from Snowpark rows, including the schema, to a tech.ml.dataset or Tablecloth dataset for further processing with Tableplot or other Scicloj libraries.
 
 ## Features that are planned but have not yet been elaborated
-- A wrapper around the Column API? Where returned columns are wrapped??
 - Support for adding column(s) to a dataset
-- Support for joins w/ integration tests
-- Support for grouping & aggs w/ integration tests
+- Support for joins
+- Support for grouping & aggs
 - Streaming read: local row iterator / transducer 
 - Streaming write?
 - Load data from stage using DataFrameReader
 - Save data to stage using DataFrameWriter
 - Authentication token expired
+- Authentication other than username/password
 - Create dataframe from range, wrapping Session.range()
-- SQL execution
 - UDFs
 - Stored procedures
 - Async

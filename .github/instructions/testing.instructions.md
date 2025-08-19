@@ -12,10 +12,10 @@ applyTo: '**'
 # Unit tests
 - Unit tests must be placed in the `test` directory, with `-test` appended to the namespace of the functions under test.
 - Every public function should have a single test named `test-<function-name>`.
-- For each function under test, different test scenarios such as success or failure edge cases can be accommodated by using the `testing` macro from clojure.test.
-- In general, test data should be generated rather than fixed, using whatever libary is specified in the solution design instructions
+- For each function under test, different test scenarios such as success, failure or edge cases can be accommodated by using the `testing` macro from clojure.test.
+- In general, test data should be generated rather than fixed, using whatever libary is specified in the solution design instructions.
 - In general, property-based tests should be preferred to example-based tests.
-- Any side effecting function calls in the function under test must be mocked, so use with-redefs or reify as needed, with `spy.core` and `spy.assert` from `tortue/spy` to assert the correct numbers of calls and expected args.
+- Any side effecting function calls in the function under test must be mocked, so use with-redefs or reify with `spy.core` and `spy.assert` from `tortue/spy` to assert the correct numbers of calls and expected args.
 - Any mocking must be limited to only where it is needed, such as mocking specific function calls inside the function under test, rather than mocking the whole function under test.
 - Don't leak any knowledge of mocks into the code under test.
 - If you need to mock any macros, use `macroexpand` beforehand to inspect the returned expansion and see what functions need to be mocked.
@@ -23,4 +23,7 @@ applyTo: '**'
 
 # Integration tests
 - Integration tests must be placed in the `integration` directory, with `-integration-test` appended to the namespace of the code under test.
+- Every public function should have a single test named `test-<function-name>`.
+- For each function under test, different test scenarios such as success and failure can be accommodated by using the `testing` macro from clojure.test.
+- In general, the integration tests for the functions in any given namespace should follow the same structure as the unit tests for that same namespace, but without any mocking.
 - For spot checks, you can run the integration tests on the command line with `clojure -M:integration`
