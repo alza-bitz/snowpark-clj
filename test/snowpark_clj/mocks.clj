@@ -29,21 +29,24 @@
   (schema [this] "Mock DataFrame.schema method")
   (write [this] "Mock DataFrame.write method"))
 
+;; FIXME remove the & from args
 (defn mock-dataframe
-  [& {:keys [lazy-chain? mock-writer mock-schema]
-      :or {lazy-chain? false mock-writer "mock-writer" mock-schema "mock-schema"}}]
-  (let [mock (protocol/mock MockDataFrame
-                            (col [_ _] (Functions/col "col"))
-                            (filter [this _] (if lazy-chain? this "filter"))
-                            (select [this _] (if lazy-chain? this "select"))
-                            (limit [this _] (if lazy-chain? this "limit"))
-                            (sort [this _] (if lazy-chain? this "sort"))
-                            (groupBy [this _] (if lazy-chain? this "groupBy"))
-                            (join [this _ _ _] (if lazy-chain? this "join"))
-                            (collect [_] "mock-rows")
-                            (show [_ _] nil)
-                            (count [_] "mock-count")
-                            (schema [_] mock-schema)
-                            (write [_] mock-writer))]
-    {:mock-dataframe mock
-     :mock-dataframe-spies (protocol/spies mock)}))
+  ([]
+   (mock-dataframe {}))
+  ([{:keys [lazy-chain? mock-writer mock-schema]
+     :or {lazy-chain? false mock-writer "mock-writer" mock-schema "mock-schema"}}]
+   (let [mock (protocol/mock MockDataFrame
+                             (col [_ _] (Functions/col "col"))
+                             (filter [this _] (if lazy-chain? this "filter"))
+                             (select [this _] (if lazy-chain? this "select"))
+                             (limit [this _] (if lazy-chain? this "limit"))
+                             (sort [this _] (if lazy-chain? this "sort"))
+                             (groupBy [this _] (if lazy-chain? this "groupBy"))
+                             (join [this _ _ _] (if lazy-chain? this "join"))
+                             (collect [_] "mock-rows")
+                             (show [_ _] nil)
+                             (count [_] "mock-count")
+                             (schema [_] mock-schema)
+                             (write [_] mock-writer))]
+     {:mock-dataframe mock
+      :mock-dataframe-spies (protocol/spies mock)})))

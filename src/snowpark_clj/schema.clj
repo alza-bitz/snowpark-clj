@@ -22,7 +22,9 @@
     :else DataTypes/StringType)) ; Fallback to string
 
 (defn infer-schema
-  "Infer Snowpark schema from a collection of maps.
+  "Infer a Snowpark schema from a collection of maps.
+   This implementation only looks at the first map, and the order of inferred fields 
+   will be determined by (seq (first data)). All inferred fields will be nullable.
    
    Args:
    - session: Session wrapper including :write-key-fn for decoding schema field names
@@ -58,23 +60,25 @@
     (= malli-type :symbol) DataTypes/StringType
     (= malli-type :nil) DataTypes/StringType
     (= malli-type :any) DataTypes/StringType
-    
+
     ;; Date/time types
     (= malli-type :inst) DataTypes/TimestampType
-    
-    ;; Numeric types with constraints
+
+    ;; Types with constraints
     (and (vector? malli-type) (= (first malli-type) :int)) DataTypes/IntegerType
     (and (vector? malli-type) (= (first malli-type) :double)) DataTypes/DoubleType
     (and (vector? malli-type) (= (first malli-type) :string)) DataTypes/StringType
-    
-    ;; Collections default to string (JSON serialization)
-    (or (= malli-type :vector) (= malli-type :set) (= malli-type :sequential)) DataTypes/StringType
-    
+
+    ;; Enums
+    (and (vector? malli-type) (= (first malli-type) :enum) (every? int? (rest malli-type))) DataTypes/IntegerType
+    (and (vector? malli-type) (= (first malli-type) :enum) (every? double? (rest malli-type))) DataTypes/DoubleType
+    (and (vector? malli-type) (= (first malli-type) :enum) (every? string? (rest malli-type))) DataTypes/StringType
+
     ;; Default fallback
-    :else DataTypes/StringType))
+    :else (throw (IllegalArgumentException. (str "Unsupported schema: " malli-type)))))
 
 (defn malli-schema->snowpark-schema
-  "Convert a Malli schema to a Snowpark StructType schema.
+  "Create a Snowpark schema from a Malli schema.
    
    Supports map schemas like:
    [:map 
@@ -93,12 +97,17 @@
   
   (let [parsed (m/form malli-schema)]
     (when-not (and (vector? parsed) (= (first parsed) :map))
-      (throw (IllegalArgumentException. "Only map schemas are supported for conversion to Snowpark schema")))
-    
+      (throw (IllegalArgumentException. "Only map schemas are supported"))) 
     (let [field-schemas (rest parsed)
-          write-key-fn (wrapper/unwrap-option session :write-key-fn)
-          fields (for [[field-name field-type] field-schemas]
-                   (let [snowpark-type (malli-type->data-type field-type)]
-                     (StructField. (write-key-fn field-name) snowpark-type true)))]
+          fields (for [[field-name & field-rest] field-schemas] 
+                   (let [field-type (if (= 2 (count field-rest))
+                                      (second field-rest)
+                                      (first field-rest))
+                         field-options (if (= 2 (count field-rest))
+                                         (first field-rest)
+                                         {})
+                         snowpark-type (malli-type->data-type field-type)
+                         write-key-fn (wrapper/unwrap-option session :write-key-fn)]
+                     (StructField. (write-key-fn field-name) snowpark-type (or (:optional field-options) false))))]
       (StructType. (into-array StructField fields)))))
 

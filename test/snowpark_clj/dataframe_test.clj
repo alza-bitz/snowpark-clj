@@ -3,32 +3,18 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [malli.core :as m]
+   [malli.generator :as mg]
    [snowpark-clj.convert :as convert]
    [snowpark-clj.dataframe :as df]
    [snowpark-clj.mocks :as mocks]
    [snowpark-clj.schema :as schema]
+   [snowpark-clj.schemas :as schemas]
    [snowpark-clj.wrapper :as wrapper]
    [spy.assert :as assert]
    [spy.core :as spy]
    [spy.protocol :as protocol])
   (:import
    [com.snowflake.snowpark_java Functions]))
-
-;; Test data
-(def test-data
-  [{:id 1 :name "Alice" :age 25 :department "Engineering" :salary 70000}
-   {:id 2 :name "Bob" :age 30 :department "Engineering" :salary 80000}
-   {:id 3 :name "Charlie" :age 35 :department "Sales" :salary 60000}])
-
-;; Malli schema for test data (Feature 4)
-(def test-employee-schema
-  (m/schema [:map
-             [:id :int]
-             [:name :string]
-             [:age :int]
-             [:department [:enum "Engineering" "Sales" "Marketing"]]
-             [:salary [:int {:min 50000 :max 100000}]]]))
 
 (defprotocol MockSession
   (createDataFrame [this rows schema] "Mock Session.createDataFrame method")
@@ -84,48 +70,49 @@
     (unwrap-options [_] opts)))
 
 (deftest test-create-dataframe
-  (testing "Creating DataFrame from Clojure data (2-arity)"
+  (testing "Create dataframe from a collection of maps"
     (let [{:keys [mock-session mock-session-spies]} (mock-session)
-          opts {:read-key-fn keyword
-                :write-key-fn name}
+          opts {:read-key-fn keyword :write-key-fn name}
           {:keys [mock-session-wrapper]} (mock-session-wrapper mock-session opts)
-          mock-schema (reify Object (toString [_] "mock-schema"))
+          data (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema])
+          mock-schema (mocks/mock-schema [])
           mock-rows []]
   
-      (with-redefs [schema/infer-schema (fn [_session _data] mock-schema)
-                    convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)]
-        (let [result (df/create-dataframe mock-session-wrapper test-data)]
+      (with-redefs [schema/infer-schema (spy/stub mock-schema)
+                    convert/maps->rows (spy/stub mock-rows)]
+        (let [result (df/create-dataframe mock-session-wrapper data)]
+
+          ;; Verify the result is properly wrapped
+          (is (= "createDataFrame" (wrapper/unwrap result)))
+          (is (= keyword (wrapper/unwrap-option result :read-key-fn)))
+          (is (= name (wrapper/unwrap-option result :write-key-fn)))
+
+          (assert/called-once-with? schema/infer-schema mock-session-wrapper data)
+          (assert/called-once-with? convert/maps->rows data mock-schema (:write-key-fn opts))
+          ;; Verify that the mock session's createDataFrame was called correctly
+          (assert/called-once-with? (:createDataFrame mock-session-spies) mock-session mock-rows mock-schema)))))
+  
+  (testing "Create dataframe from a collection of maps and schema"
+    (let [{:keys [mock-session mock-session-spies]} (mock-session)
+          opts {:read-key-fn keyword :write-key-fn name}
+          {:keys [mock-session-wrapper]} (mock-session-wrapper mock-session opts)
+          data (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema-with-optional-keys])
+          {:keys [mock-schema]} (mocks/mock-schema [])
+          mock-rows []]
+  
+      (with-redefs [convert/maps->rows (spy/stub mock-rows)]
+        (let [result (df/create-dataframe mock-session-wrapper data mock-schema)]
   
           ;; Verify the result is properly wrapped
           (is (= "createDataFrame" (wrapper/unwrap result)))
           (is (= keyword (wrapper/unwrap-option result :read-key-fn)))
           (is (= name (wrapper/unwrap-option result :write-key-fn)))
-  
+          
+          (assert/called-once-with? convert/maps->rows data mock-schema (:write-key-fn opts))
           ;; Verify that the mock session's createDataFrame was called correctly
-          (assert/called-once? (:createDataFrame mock-session-spies))
-          (assert/called-with? (:createDataFrame mock-session-spies) mock-session mock-rows mock-schema)))))
+          (assert/called-once-with? (:createDataFrame mock-session-spies) mock-session mock-rows mock-schema)))))
   
-  (testing "Creating DataFrame from Clojure data with explicit Snowpark schema (3-arity)"
-    (let [{:keys [mock-session mock-session-spies]} (mock-session)
-          opts {:read-key-fn keyword
-                :write-key-fn name}
-          {:keys [mock-session-wrapper]} (mock-session-wrapper mock-session opts)
-          snowpark-schema (schema/malli-schema->snowpark-schema mock-session-wrapper test-employee-schema)
-          mock-rows []]
-  
-      (with-redefs [convert/maps->rows (fn [_data _schema _write-key-fn] mock-rows)]
-        (let [result (df/create-dataframe mock-session-wrapper test-data snowpark-schema)]
-  
-          ;; Verify the result is properly wrapped
-          (is (= "createDataFrame" (wrapper/unwrap result)))
-          (is (= keyword (wrapper/unwrap-option result :read-key-fn)))
-          (is (= name (wrapper/unwrap-option result :write-key-fn)))
-  
-          ;; Verify that the mock session's createDataFrame was called correctly
-          (assert/called-once? (:createDataFrame mock-session-spies))
-          (assert/called-with? (:createDataFrame mock-session-spies) mock-session mock-rows snowpark-schema)))))
-  
-  (testing "Creating DataFrame from empty data should throw exception"
+  (testing "Create dataframe from empty data should throw exception"
     (is (thrown-with-msg? IllegalArgumentException 
                           #"Cannot create dataframe from empty data"
                           (df/create-dataframe (mock-session-wrapper (mock-session) {}) [])))))

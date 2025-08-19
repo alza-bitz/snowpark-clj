@@ -15,13 +15,13 @@
   "Convert a Clojure map to a Snowpark Row
    
    Args:
-   - m: Clojure map to convert
+   - data: Clojure map to convert
    - schema: Snowpark schema
    - write-key-fn: Function to decode keys when matching schema fields"
-  [m schema write-key-fn]
+  [data schema write-key-fn]
   (let [field-names (.names schema)
         ;; Create a case-insensitive lookup by normalizing both map keys and field names
-        normalized-map (into {} (for [[k v] m]
+        normalized-map (into {} (for [[k v] data]
                                   [(str/lower-case (write-key-fn k)) v]))
         lookup-value (fn [field-name]
                        (get normalized-map (str/lower-case field-name)))
@@ -31,8 +31,8 @@
 
 (defn maps->rows
   "Convert a vector of maps to an array of Snowpark Rows given a schema."
-  [maps schema write-key-fn]
-  (let [rows (map #(map->row % schema write-key-fn) maps)]
+  [data schema write-key-fn]
+  (let [rows (map #(map->row % schema write-key-fn) data)]
     (into-array com.snowflake.snowpark_java.Row rows)))
 
 (defn row->map
@@ -44,7 +44,7 @@
           (for [i (range field-count)
                 :let [field-name (nth field-names i)
                       value (.get row i)]]
-            [(read-key-fn field-name) value]))))
+            (when value [(read-key-fn field-name) value])))))
 
 (defn rows->maps
   "Convert a collection of Snowpark Rows to a vector of maps"
