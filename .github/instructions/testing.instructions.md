@@ -27,3 +27,6 @@ applyTo: '**'
 - For each function under test, different test scenarios such as success and failure can be accommodated by using the `testing` macro from clojure.test.
 - In general, the integration tests for the functions in any given namespace should follow the same structure as the unit tests for that same namespace, but without any mocking.
 - For spot checks, you can run the integration tests on the command line with `clojure -M:integration`
+
+# UAT tests
+- UAT tests must be placed in the `uat` directory, with `-uat-test` appended to the namespace of the code under test.

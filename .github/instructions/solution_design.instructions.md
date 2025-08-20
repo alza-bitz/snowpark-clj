@@ -92,7 +92,6 @@ The library should implement the following layers as namespaces:
 
 # All layers: integration tests
 - Use test fixtures to create a session before running each test and to ensure any tables saved by tests are deleted after each test.
-- For tests that depend on test data in a Snowflake table, use a test fixture to load the test data using dataframe/save-as-table before running all tests and to ensure the table is deleted after all tests.
 - Use my trial Snowflake account by creating a session with a snowflake.edn file.
 
 # All layers: uat tests

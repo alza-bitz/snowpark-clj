@@ -6,11 +6,6 @@
 
 ;; To create a column by name, see the snowpark-clj.dataset/col function
 
-(comment
-  (let [col (Functions/col "MYCOL")]
-    (instance? com.snowflake.snowpark_java.Column col)
-    (.getName col)))
-
 (defn lit
   "Create a column with a literal value"
   [value]
@@ -20,6 +15,11 @@
   "Create a column from SQL expression string"
   [expression]
   (Functions/expr expression))
+
+(defn count-fn
+  "Returns either the number of non-NULL records for the specified columns, or the total number of records."
+  [col]
+  (Functions/count col))
 
 ;; Comparison functions (these are Column instance methods)
 
@@ -86,6 +86,16 @@
   "Minimum value"
   [col]
   (Functions/min col))
+
+(defn avg
+  "Average value"
+  [col]
+  (Functions/avg col))
+
+(defn sum
+  "Sum of values"
+  [col]
+  (Functions/sum col))
 
 ;; String functions
 

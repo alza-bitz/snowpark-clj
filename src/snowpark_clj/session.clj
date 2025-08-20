@@ -5,6 +5,7 @@
    [malli.core :as m]
    [malli.error :as me]
    [mask.core :as mask]
+   [snowpark-clj.column :as col]
    [snowpark-clj.config :as config]
    [snowpark-clj.wrapper :as wrapper])
   (:import
@@ -16,7 +17,7 @@
   (Session/builder))
 
 (def default-opts
-  {:read-key-fn (comp keyword str/lower-case)
+  {:read-key-fn (comp keyword str/lower-case col/quoted)
    :write-key-fn (comp str/upper-case name)})
 
 (defn create-session

@@ -178,7 +178,22 @@
         write-key-fn (wrapper/unwrap-option df :write-key-fn)
         col-array (to-columns-or-names cols write-key-fn)
         result-grouped-df (.groupBy raw-df col-array)]
-    (wrapper/wrap-dataframe result-grouped-df (wrapper/unwrap-options df))))
+    (wrapper/wrap-grouped result-grouped-df (wrapper/unwrap-options df))))
+
+(defn agg
+  "Computes an aggregation according to the supplied columns.
+   
+   Args:
+   - df: Dataframe wrapper
+   - cols: Single column or vector of columns (Column objects or encoded column names that will be decoded using write-key-fn)
+
+   Returns: a dataframe wrapper"
+  [df cols]
+  (let [raw-df (wrapper/unwrap df)
+        write-key-fn (wrapper/unwrap-option df :write-key-fn)
+        col-array (to-columns-or-names cols write-key-fn)
+        result-df (.agg raw-df col-array)]
+    (wrapper/wrap-dataframe result-df (wrapper/unwrap-options df))))
 
 (defn join
   "Join two dataframes.
@@ -234,7 +249,7 @@
    (let [raw-df (wrapper/unwrap df)]
      (.show raw-df n))))
 
-(defn df-count
+(defn row-count
   "Count the number of rows in a dataframe.
    
    Args:

@@ -314,12 +314,12 @@
       (assert/called-with? (:show mock-dataframe-spies) mock-dataframe 20)  ; default
       (assert/called-with? (:show mock-dataframe-spies) mock-dataframe 5))))
 
-(deftest test-df-count
+(deftest test-row-count
   (testing "Count function calls DataFrame.count"
     (let [{:keys [mock-dataframe mock-dataframe-spies]} (mocks/mock-dataframe)
           opts {:read-key-fn keyword 
                    :write-key-fn (comp str/upper-case name)}
-          result (df/df-count (mock-dataframe-wrapper mock-dataframe opts))]
+          result (df/row-count (mock-dataframe-wrapper mock-dataframe opts))]
       
       ;; Verify the result is the count returned by mock
       (is (= "mock-count" result))

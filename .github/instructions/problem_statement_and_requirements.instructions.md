@@ -14,10 +14,10 @@ As a Clojure wrapper for an existing Java API:
 2. To aid those who are familiar with Clojure, the external API should be idiomatic Clojure.
 
 ## Snowpark considerations
-- Snowpark sessions appear to be thread-local, as in, creating a session on a thread that already has a session bound will have it's session replaced by the new session.
-- Snowpark operations are either transformations (lazy) or actions (eager).
-- Snowpark transformations defer computation until some (eager) action is called e.g. collect().
+- Snowpark sessions are mutable and not thread-safe.
 - Snowpark dataframes are immutable.
+- Snowpark dataframe operations are either transformations (lazy) or actions (eager).
+- Transformations defer computation until some (eager) action is called e.g. collect().
 - The com.snowflake.snowpark_java package contains the main classes for the Snowpark API.
 - The com.snowflake.snowpark_java.types package contains classes for defining schemas.
 
@@ -66,7 +66,6 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 ## Features that are planned but have not yet been elaborated
 - Support for adding column(s) to a dataset
 - Support for joins
-- Support for grouping & aggs
 - Streaming read: local row iterator / transducer 
 - Streaming write?
 - Load data from stage using DataFrameReader

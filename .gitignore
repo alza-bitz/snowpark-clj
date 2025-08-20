@@ -14,4 +14,4 @@ pom.xml.asc
 .lsp/
 
 .actsecrets
-snowflake.edn
+/snowflake.edn

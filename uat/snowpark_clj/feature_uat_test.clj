@@ -1,46 +1,21 @@
-(ns snowpark-clj.integration-test
+(ns snowpark-clj.feature-uat-test
   "Integration tests for the snowpark-clj library"
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
    [malli.generator :as mg]
    [snowpark-clj.core :as sp]
+   [snowpark-clj.fixtures :refer [*session* session-fixture]]
    [snowpark-clj.schemas :as schemas]
    [snowpark-clj.wrapper :as wrapper]))
 
-;; Test data and schema
 (def test-data
   [{:id 1 :name "Alice" :department "Engineering" :salary 70000}
    {:id 2 :name "Bob" :department "Engineering" :salary 80000}
    {:id 3 :name "Charlie" :department "Sales" :salary 60000}])
 
-;; Test fixtures
-(def ^:dynamic *session* nil)
-(def test-table-name "SNOWPARK_CLJ_TEST_TABLE")
+(def test-table-name "SNOWPARK_CLJ_TEST_FEATURE_TABLE")
 
-(defn session-fixture
-  "Create a session for testing and clean up afterwards"
-  [f]
-  (let [session (sp/create-session "integration/snowflake.edn")]
-    (try
-      ;; Clean up any existing test table before running test
-      (try
-        (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
-        (catch Exception e
-          (println "Warning: Could not drop table:" (.getMessage e))))
-      (binding [*session* session] 
-        (f))
-      (finally
-        ;; Clean up: drop test table and close session
-        (try
-          (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
-          (catch Exception e
-            (println "Warning: Could not drop table during cleanup:" (.getMessage e))))
-        (try
-          (sp/close-session session)
-          (catch Exception e
-            (println "Warning: Could not close session:" (.getMessage e))))))))
-
-(use-fixtures :each session-fixture)
+(use-fixtures :each (session-fixture "integration/snowflake.edn" test-table-name))
 
 ;; Feature 1 Integration Tests
 (deftest test-feature-1-create-and-save-dataframe
@@ -85,13 +60,12 @@
 
       ;; Read from table and apply transformations
       (let [table-df (sp/table *session* test-table-name)
-            salary-col (sp/col table-df :salary)
-            salary-condition (sp/gt salary-col (sp/lit 65000))
-            filtered-df (sp/filter table-df salary-condition)
-            selected-df (sp/select filtered-df [:name :salary])
-            sorted-df (sp/sort selected-df [:salary])
-            limited-df (sp/limit sorted-df 2)
-            results (sp/collect limited-df)]
+            results (-> table-df
+                        (sp/filter (sp/gt (sp/col table-df :salary) (sp/lit 65000)))
+                        (sp/select [:name :salary])
+                        (sp/sort :salary)
+                        (sp/limit 2)
+                        (sp/collect))]
 
         (is (vector? results))
         (is (<= (count results) 2))
@@ -104,7 +78,7 @@
 
       ;; Test other action operations
       (let [table-df (sp/table *session* test-table-name)
-            row-count (sp/count table-df)]
+            row-count (sp/row-count table-df)]
         (is (= 3 row-count)))
 
       (let [table-df (sp/table *session* test-table-name)
@@ -118,7 +92,7 @@
     ;; Test with-open macro
     (let [result (with-open [session (sp/create-session "integration/snowflake.edn")]
                    (let [df (sp/create-dataframe session test-data)]
-                     (sp/count df)))]
+                     (sp/row-count df)))]
       (is (= 3 result)))))
 
 ;; Feature 4 Integration Tests (Malli Schema Conversion)
@@ -129,7 +103,7 @@
           schema (sp/malli-schema->snowpark-schema *session* schemas/employee-schema-with-optional-keys)
           dataframe (sp/create-dataframe *session* data schema)]
 
-      (is (= 5 (sp/count dataframe)))
+      (is (= 5 (sp/row-count dataframe)))
 
       ;; Round-trip test: create, collect, and verify data integrity
       (let [result (sp/collect dataframe)]
@@ -247,7 +221,7 @@
           dataframe (sp/create-dataframe *session* large-data)]
       
       (is (some? dataframe))
-      (is (= 1000 (sp/count dataframe)))
+      (is (= 1000 (sp/row-count dataframe)))
       
       ;; Test filtering and aggregation on larger dataset
       (let [score-col (sp/col dataframe :score)

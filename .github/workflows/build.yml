@@ -17,4 +17,5 @@ jobs:
     with:
       java-version: 11
       integration: true
+      uat: true
     secrets: inherit
