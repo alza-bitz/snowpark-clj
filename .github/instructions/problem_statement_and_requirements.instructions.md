@@ -66,7 +66,6 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 ## Features that are planned but have not yet been elaborated
 - Support for adding column(s) to a dataset
 - Support for joins
-- Support for grouping & aggs
 - Streaming read: local row iterator / transducer 
 - Streaming write?
 - Load data from stage using DataFrameReader

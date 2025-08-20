@@ -355,17 +355,17 @@
             ;; Engineering: Alice, Bob = 2 people
             (is (= 1 (count (results-by-dept "Engineering"))))
             (let [eng-result (first (results-by-dept "Engineering"))]
-              (is (= 2 (get eng-result :count_department))))
+              (is (= 2 (get eng-result :count-department))))
             
             ;; Marketing: Charlie, Diana = 2 people  
             (is (= 1 (count (results-by-dept "Marketing"))))
             (let [mkt-result (first (results-by-dept "Marketing"))]
-              (is (= 2 (get mkt-result :count_department))))
+              (is (= 2 (get mkt-result :count-department))))
             
             ;; Sales: Eve, Frank = 2 people
             (is (= 1 (count (results-by-dept "Sales"))))
             (let [sales-result (first (results-by-dept "Sales"))]
-              (is (= 2 (get sales-result :count_department)))))))
+              (is (= 2 (get sales-result :count-department)))))))
 
       (testing "Group by single column with multiple aggregations"
         ;; Group by department and get count and average salary
@@ -382,13 +382,13 @@
 
           ;; Verify structure - each row should have department, count, and average
           (is (every? #(contains? % :department) collected))
-          (is (every? #(contains? % :count_department) collected))
-          (is (every? #(contains? % :avg_salary) collected))
+          (is (every? #(contains? % :count-department) collected))
+          (is (every? #(contains? % :avg-salary) collected))
 
           ;; Verify specific values for Engineering department
           (let [eng-result (first (filter #(= "Engineering" (:department %)) collected))
-                eng-count (get eng-result :count_department)
-                eng-avg (get eng-result :avg_salary)]
+                eng-count (get eng-result :count-department)
+                eng-avg (get eng-result :avg-salary)]
             (is (= 2 eng-count))
             ;; Engineering average: (75000 + 85000) / 2 = 80000
             (is (= 80000.0M eng-avg)))))
@@ -417,27 +417,27 @@
             ;; Engineering-Senior should have 2 people (Alice, Bob)
             (let [eng-senior (first (results-by-group "Engineering-Senior"))]
               (is (some? eng-senior))
-              (is (= 2 (get eng-senior :count_department))))
+              (is (= 2 (get eng-senior :count-department))))
             
             ;; Engineering-Junior should have 1 person (Charlie)
             (let [eng-junior (first (results-by-group "Engineering-Junior"))]
               (is (some? eng-junior))
-              (is (= 1 (get eng-junior :count_department))))
+              (is (= 1 (get eng-junior :count-department))))
             
             ;; Marketing-Senior should have 1 person (Diana)
             (let [mkt-senior (first (results-by-group "Marketing-Senior"))]
               (is (some? mkt-senior))
-              (is (= 1 (get mkt-senior :count_department))))
+              (is (= 1 (get mkt-senior :count-department))))
             
             ;; Marketing-Junior should have 1 person (Eve)
             (let [mkt-junior (first (results-by-group "Marketing-Junior"))]
               (is (some? mkt-junior))
-              (is (= 1 (get mkt-junior :count_department))))
+              (is (= 1 (get mkt-junior :count-department))))
             
             ;; Sales-Senior should have 1 person (Frank)
             (let [sales-senior (first (results-by-group "Sales-Senior"))]
               (is (some? sales-senior))
-              (is (= 1 (get sales-senior :count_department))))))
+              (is (= 1 (get sales-senior :count-department))))))
 
       (testing "Group by with filtering before grouping"
         ;; Filter high salary employees first, then group by department

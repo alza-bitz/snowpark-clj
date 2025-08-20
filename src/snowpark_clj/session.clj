@@ -5,6 +5,7 @@
    [malli.core :as m]
    [malli.error :as me]
    [mask.core :as mask]
+   [snowpark-clj.column :as col]
    [snowpark-clj.config :as config]
    [snowpark-clj.wrapper :as wrapper])
   (:import
@@ -15,24 +16,8 @@
   []
   (Session/builder))
 
-(defn default-read-key-fn
-  "Default function to transform column names from Snowflake to Clojure.
-   Converts aggregation function patterns like 'count(<colname>)', 'avg(<colname>)', etc. 
-   to 'count_<colname>', 'avg_<colname>' to avoid issues with parentheses in keywords.
-   Also handles quoted field names like '\"COUNT(DEPARTMENT)\"'."
-  [column-name]
-  (let [lowercased (str/lower-case column-name)
-        ;; Remove quotes if present
-        cleaned (if (and (str/starts-with? lowercased "\"") 
-                        (str/ends-with? lowercased "\""))
-                  (subs lowercased 1 (dec (count lowercased)))
-                  lowercased)]
-    (if-let [match (re-matches #"(\w+)\((.+)\)" cleaned)]
-      (keyword (str (second match) "_" (nth match 2)))
-      (keyword cleaned))))
-
 (def default-opts
-  {:read-key-fn default-read-key-fn
+  {:read-key-fn (comp keyword str/lower-case col/quoted)
    :write-key-fn (comp str/upper-case name)})
 
 (defn create-session
