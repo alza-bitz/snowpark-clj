@@ -5,8 +5,8 @@
             [snowpark-clj.functions :as fn]
             [snowpark-clj.schema]
             [snowpark-clj.session])
-  (:refer-clojure :exclude [filter sort group-by count take
-                            and or not abs max min]))
+  (:refer-clojure :exclude [filter sort group-by take
+                            count and or not abs max min]))
 
 ;; Re-export functions from other layers with preserved docstrings and arglists
 (import-vars
@@ -24,8 +24,10 @@
    select
    where
    limit
+   agg
    join
    collect
+   row-count
    show 
    save-as-table
    col
@@ -40,7 +42,9 @@
    lte
    neq
    upper
-   lower])
+   lower
+   avg
+   sum])
 
 ;; Create clean aliases for prefixed functions that conflict with clojure.core
 ;; These preserve the original metadata (docstrings, arglists) from the prefixed versions
@@ -56,24 +60,13 @@
        :doc (:doc (meta #'df/df-group-by))}
   group-by df/df-group-by)
 
-(def ^{:arglists (:arglists (meta #'df/df-count))
-       :doc (:doc (meta #'df/df-count))}
-  count df/df-count)
-
 (def ^{:arglists (:arglists (meta #'df/df-take))
        :doc (:doc (meta #'df/df-take))}
   take df/df-take)
 
-;; (def ^{:arglists (:arglists (meta #'df/df-keys))
-;;        :doc (:doc (meta #'df/df-keys))}
-;;   keys df/df-keys)
-
-;; (def ^{:arglists (:arglists (meta #'df/df-vals))
-;;        :doc (:doc (meta #'df/df-vals))}
-;;   vals df/df-vals)
-
 ;; Same as above but done declaratively / data-driven style
-(let [alias-mappings [['fn/and-fn 'and]
+(let [alias-mappings [['fn/count-fn 'count]
+                      ['fn/and-fn 'and]
                       ['fn/or-fn 'or]
                       ['fn/not-fn 'not]
                       ['fn/abs-fn 'abs]

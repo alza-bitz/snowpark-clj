@@ -104,7 +104,7 @@
 
       ;; Test other action operations
       (let [table-df (sp/table *session* test-table-name)
-            row-count (sp/count table-df)]
+            row-count (sp/row-count table-df)]
         (is (= 3 row-count)))
 
       (let [table-df (sp/table *session* test-table-name)
@@ -118,7 +118,7 @@
     ;; Test with-open macro
     (let [result (with-open [session (sp/create-session "integration/snowflake.edn")]
                    (let [df (sp/create-dataframe session test-data)]
-                     (sp/count df)))]
+                     (sp/row-count df)))]
       (is (= 3 result)))))
 
 ;; Feature 4 Integration Tests (Malli Schema Conversion)
@@ -129,7 +129,7 @@
           schema (sp/malli-schema->snowpark-schema *session* schemas/employee-schema-with-optional-keys)
           dataframe (sp/create-dataframe *session* data schema)]
 
-      (is (= 5 (sp/count dataframe)))
+      (is (= 5 (sp/row-count dataframe)))
 
       ;; Round-trip test: create, collect, and verify data integrity
       (let [result (sp/collect dataframe)]
@@ -247,7 +247,7 @@
           dataframe (sp/create-dataframe *session* large-data)]
       
       (is (some? dataframe))
-      (is (= 1000 (sp/count dataframe)))
+      (is (= 1000 (sp/row-count dataframe)))
       
       ;; Test filtering and aggregation on larger dataset
       (let [score-col (sp/col dataframe :score)

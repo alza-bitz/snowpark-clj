@@ -328,6 +328,134 @@
           ;; Verify alphabetical sorting by name
           (is (= ["Alice" "Bob" "Charlie" "Diana"] (map :name collected))))))))
 
+(deftest test-df-group-by
+  (testing "Group dataframe by columns and perform aggregations"
+    ;; Create test data with known values for predictable grouping
+    (let [test-data [{:id 1 :name "Alice" :department "Engineering" :salary 75000}
+                     {:id 2 :name "Bob" :department "Engineering" :salary 85000}
+                     {:id 3 :name "Charlie" :department "Marketing" :salary 60000}
+                     {:id 4 :name "Diana" :department "Marketing" :salary 70000}
+                     {:id 5 :name "Eve" :department "Sales" :salary 90000}
+                     {:id 6 :name "Frank" :department "Sales" :salary 55000}]
+          dataframe (df/create-dataframe *test-session* test-data)]
+
+      (testing "Group by single column with count aggregation"
+        ;; Group by department and count employees in each department
+        (let [dept-col (df/col dataframe :department)
+              count-col (fn/count-fn dept-col)
+              grouped-df (df/df-group-by dataframe :department)
+              result-df (df/agg grouped-df count-col)
+              collected (df/collect result-df)]
+
+          ;; Should get 3 rows (Engineering, Marketing, Sales)
+          (is (= 3 (count collected)))
+
+          ;; Verify each department has the expected count
+          (let [results-by-dept (group-by :department collected)]
+            ;; Engineering: Alice, Bob = 2 people
+            (is (= 1 (count (results-by-dept "Engineering"))))
+            (let [eng-result (first (results-by-dept "Engineering"))]
+              (is (= 2 (get eng-result :count_department))))
+            
+            ;; Marketing: Charlie, Diana = 2 people  
+            (is (= 1 (count (results-by-dept "Marketing"))))
+            (let [mkt-result (first (results-by-dept "Marketing"))]
+              (is (= 2 (get mkt-result :count_department))))
+            
+            ;; Sales: Eve, Frank = 2 people
+            (is (= 1 (count (results-by-dept "Sales"))))
+            (let [sales-result (first (results-by-dept "Sales"))]
+              (is (= 2 (get sales-result :count_department)))))))
+
+      (testing "Group by single column with multiple aggregations"
+        ;; Group by department and get count and average salary
+        (let [dept-col (df/col dataframe :department)
+              salary-col (df/col dataframe :salary)
+              count-col (fn/count-fn dept-col)
+              avg-col (fn/avg salary-col)
+              grouped-df (df/df-group-by dataframe :department)
+              result-df (df/agg grouped-df [count-col avg-col])
+              collected (df/collect result-df)]
+
+          ;; Should get 3 rows (Engineering, Marketing, Sales)
+          (is (= 3 (count collected)))
+
+          ;; Verify structure - each row should have department, count, and average
+          (is (every? #(contains? % :department) collected))
+          (is (every? #(contains? % :count_department) collected))
+          (is (every? #(contains? % :avg_salary) collected))
+
+          ;; Verify specific values for Engineering department
+          (let [eng-result (first (filter #(= "Engineering" (:department %)) collected))
+                eng-count (get eng-result :count_department)
+                eng-avg (get eng-result :avg_salary)]
+            (is (= 2 eng-count))
+            ;; Engineering average: (75000 + 85000) / 2 = 80000
+            (is (= 80000.0M eng-avg)))))
+
+      (testing "Group by multiple columns"
+        ;; Create test data with explicit salary categories to demonstrate multi-column grouping
+        (let [multi-group-data [{:id 1 :name "Alice" :department "Engineering" :salary 75000 :experience "Senior"}
+                                {:id 2 :name "Bob" :department "Engineering" :salary 85000 :experience "Senior"}
+                                {:id 3 :name "Charlie" :department "Engineering" :salary 65000 :experience "Junior"}
+                                {:id 4 :name "Diana" :department "Marketing" :salary 70000 :experience "Senior"}
+                                {:id 5 :name "Eve" :department "Marketing" :salary 60000 :experience "Junior"}
+                                {:id 6 :name "Frank" :department "Sales" :salary 80000 :experience "Senior"}]
+              multi-df (df/create-dataframe *test-session* multi-group-data)
+              
+              ;; Group by both department AND experience level (multiple columns)
+              grouped-df (df/df-group-by multi-df [:department :experience])
+              count-col (fn/count-fn (df/col multi-df :department))
+              result-df (df/agg grouped-df count-col)
+              collected (df/collect result-df)]
+
+          ;; Should get 5 groups: Engineering-Senior(2), Engineering-Junior(1), Marketing-Senior(1), Marketing-Junior(1), Sales-Senior(1)
+          (is (= 5 (count collected)))
+
+          ;; Verify specific group counts
+          (let [results-by-group (group-by #(str (:department %) "-" (:experience %)) collected)]
+            ;; Engineering-Senior should have 2 people (Alice, Bob)
+            (let [eng-senior (first (results-by-group "Engineering-Senior"))]
+              (is (some? eng-senior))
+              (is (= 2 (get eng-senior :count_department))))
+            
+            ;; Engineering-Junior should have 1 person (Charlie)
+            (let [eng-junior (first (results-by-group "Engineering-Junior"))]
+              (is (some? eng-junior))
+              (is (= 1 (get eng-junior :count_department))))
+            
+            ;; Marketing-Senior should have 1 person (Diana)
+            (let [mkt-senior (first (results-by-group "Marketing-Senior"))]
+              (is (some? mkt-senior))
+              (is (= 1 (get mkt-senior :count_department))))
+            
+            ;; Marketing-Junior should have 1 person (Eve)
+            (let [mkt-junior (first (results-by-group "Marketing-Junior"))]
+              (is (some? mkt-junior))
+              (is (= 1 (get mkt-junior :count_department))))
+            
+            ;; Sales-Senior should have 1 person (Frank)
+            (let [sales-senior (first (results-by-group "Sales-Senior"))]
+              (is (some? sales-senior))
+              (is (= 1 (get sales-senior :count_department))))))
+
+      (testing "Group by with filtering before grouping"
+        ;; Filter high salary employees first, then group by department
+        (let [high-salary-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 70000)))
+              grouped-df (df/df-group-by high-salary-df :department)
+              count-col (fn/count-fn (df/col high-salary-df :department))
+              result-df (df/agg grouped-df count-col)
+              collected (df/collect result-df)]
+
+          ;; Should get 2 departments (Engineering, Sales) since Marketing employees have salary <= 70000
+          (is (= 2 (count collected)))
+
+          ;; Verify only departments with high salary employees are present
+          (let [departments (set (map :department collected))]
+            (is (contains? departments "Engineering"))  ; Alice (75k), Bob (85k)
+            (is (contains? departments "Sales"))        ; Eve (90k)
+            (is (not (contains? departments "Marketing"))))))))))  ; Charlie (60k), Diana (70k) don't qualify
+
 (deftest test-collect
   (testing "Collect dataframe rows to local collection"
     ;; Create test data with known values for predictable results
@@ -419,7 +547,7 @@
               limited-df (df/limit filtered-df 1)]
           (is (nil? (df/show limited-df))))))))
 
-(deftest test-df-count
+(deftest test-df-row-count
   (testing "Count rows in dataframe"
     ;; Create test data with known number of rows
     (let [test-data [{:id 1 :name "Alice" :department "Engineering" :salary 75000}
@@ -430,7 +558,7 @@
           dataframe (df/create-dataframe *test-session* test-data)]
       
       (testing "Basic count functionality"
-        (let [count-result (df/df-count dataframe)]
+        (let [count-result (df/row-count dataframe)]
           ;; df-count should return the number of rows
           (is (= (count test-data) count-result))
           (is (= 5 count-result))))
@@ -438,7 +566,7 @@
       (testing "Count on empty dataframe"
         ;; Create an empty result by filtering with impossible condition
         (let [empty-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 100000)))
-              count-result (df/df-count empty-df)]
+              count-result (df/row-count empty-df)]
           
           ;; Should return 0 for empty dataframe
           (is (= 0 count-result))))
@@ -446,7 +574,7 @@
       (testing "Count works with transformations"
         ;; Apply filter transformation and count
         (let [filtered-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 70000)))
-              count-result (df/df-count filtered-df)]
+              count-result (df/row-count filtered-df)]
           
           ;; Should count only rows where salary > 70000 (Alice, Bob, Eve = 3 people)
           (is (= 3 count-result))))
@@ -454,7 +582,7 @@
       (testing "Count after select transformation"
         ;; Select specific columns and count - should still return same number of rows
         (let [selected-df (df/select dataframe [:name :department])
-              count-result (df/df-count selected-df)]
+              count-result (df/row-count selected-df)]
           
           ;; Should return same count as original dataframe
           (is (= (count test-data) count-result))
@@ -463,7 +591,7 @@
       (testing "Count after limit transformation"
         ;; Apply limit and count
         (let [limited-df (df/limit dataframe 3)
-              count-result (df/df-count limited-df)]
+              count-result (df/row-count limited-df)]
           
           ;; Should return the limited number of rows
           (is (= 3 count-result))))
@@ -471,7 +599,7 @@
       (testing "Count is eager operation"
         ;; Verify that count actually executes and doesn't just return a lazy transformation
         ;; This is tested implicitly by the fact that we get actual numbers, not wrapper objects
-        (let [count-result (df/df-count dataframe)]
+        (let [count-result (df/row-count dataframe)]
           (is (number? count-result))
           (is (pos? count-result)))))))
 

@@ -130,3 +130,26 @@
       (unwrap [_] (:dataframe base-map))
       (unwrap-option [_ option-key] (get base-map option-key))
       (unwrap-options [_] (dissoc base-map :dataframe)))))
+
+(defn wrap-grouped
+  "Wrap a Snowpark RelationalGroupedDataFrame with session options"
+  [session opts]
+  (let [base-map (merge {:grouped session} opts)]
+    (reify
+
+      clojure.lang.IHashEq
+      (hasheq [_]
+        (.hasheq base-map))
+
+      Object
+      (hashCode [_]
+        (.hashCode base-map))
+      (equals [this o]
+        (.equiv this o))
+      (toString [_]
+        (.toString base-map))
+
+      IWrappedSessionOptions
+      (unwrap [_] (:grouped base-map))
+      (unwrap-option [_ option-key] (get base-map option-key))
+      (unwrap-options [_] (dissoc base-map :grouped)))))
