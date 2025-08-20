@@ -1,4 +1,4 @@
-(ns snowpark-clj.integration-test
+(ns snowpark-clj.feature-uat-test
   "Integration tests for the snowpark-clj library"
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
