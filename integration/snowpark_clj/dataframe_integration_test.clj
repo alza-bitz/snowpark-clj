@@ -3,40 +3,20 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [malli.generator :as mg]
    [snowpark-clj.dataframe :as df]
+   [snowpark-clj.fixtures :refer [*session* session-fixture]]
    [snowpark-clj.functions :as fn]
    [snowpark-clj.schema :as schema]
    [snowpark-clj.schemas :as schemas]
-   [snowpark-clj.session :as session]
    [snowpark-clj.wrapper :as wrapper]))
 
-;; Test configuration
-(def test-config-file "integration/snowflake.edn")
-
-;; Test fixtures
-(def ^:dynamic *test-session* nil)
 (def test-table-name "SNOWPARK_CLJ_TEST_DATAFRAME_TABLE")
 
-(defn session-fixture
-  "Creates a session before each test and ensures cleanup after"
-  [test-fn]
-  (with-open [session (session/create-session test-config-file)]
-    (binding [*test-session* session]
-      (try
-        (test-fn)
-        (finally
-          ;; Clean up any test tables created
-          (try
-            (.sql (wrapper/unwrap session) (str "DROP TABLE IF EXISTS " test-table-name))
-            (catch Exception _
-              ;; Ignore errors during cleanup
-              nil)))))))
-
-(use-fixtures :each session-fixture)
+(use-fixtures :each (session-fixture "integration/snowflake.edn" test-table-name))
 
 (deftest test-create-dataframe
   (testing "Create dataframe from a collection of maps without schema"
     (let [data (mg/generate [:vector {:gen/min 3 :gen/max 5} schemas/employee-schema])
-          result (df/create-dataframe *test-session* data)]
+          result (df/create-dataframe *session* data)]
 
       ;; Verify the result is properly wrapped
       (is (wrapper/wrapper? result))
@@ -65,8 +45,8 @@
   (testing "Create dataframe from a collection of maps with explicit schema"
     (let [data (mg/generate [:vector {:gen/min 2 :gen/max 5} schemas/employee-schema-with-optional-keys])
           ;; Create a schema using the schema namespace
-          session-schema (schema/malli-schema->snowpark-schema *test-session* schemas/employee-schema-with-optional-keys)
-          result (df/create-dataframe *test-session* data session-schema)]
+          session-schema (schema/malli-schema->snowpark-schema *session* schemas/employee-schema-with-optional-keys)
+          result (df/create-dataframe *session* data session-schema)]
 
       ;; Verify the result is properly wrapped
       (is (wrapper/wrapper? result))
@@ -92,17 +72,17 @@
   (testing "Create dataframe from empty data should throw exception"
     (is (thrown-with-msg? IllegalArgumentException
                           #"Cannot create dataframe from empty data"
-                          (df/create-dataframe *test-session* []))))
+                          (df/create-dataframe *session* []))))
 
   (testing "Create dataframe and save to table for round-trip verification"
     (let [data (mg/generate [:vector {:gen/min 3 :gen/max 3} schemas/employee-schema])
-          result (df/create-dataframe *test-session* data)]
+          result (df/create-dataframe *session* data)]
 
       ;; Save the dataframe to a table
       (df/save-as-table result test-table-name :overwrite)
 
       ;; Read it back using table function and verify
-      (let [table-df (df/table *test-session* test-table-name)
+      (let [table-df (df/table *session* test-table-name)
             collected-data (df/collect table-df)]
 
         (is (= (count data) (count collected-data)))
@@ -120,13 +100,13 @@
   (testing "Create dataframe from existing Snowflake table"
     ;; First create some test data in a table
     (let [test-data (mg/generate [:vector {:gen/min 2 :gen/max 4} schemas/employee-schema])
-          temp-df (df/create-dataframe *test-session* test-data)]
+          temp-df (df/create-dataframe *session* test-data)]
 
       ;; Save to table
       (df/save-as-table temp-df test-table-name :overwrite)
 
       ;; Now test the table function
-      (let [result (df/table *test-session* test-table-name)]
+      (let [result (df/table *session* test-table-name)]
 
         ;; Verify the result is properly wrapped
         (is (wrapper/wrapper? result))
@@ -158,14 +138,14 @@
 
   (testing "Table function with non-existent table should throw exception"
     (is (thrown? Exception
-                 (-> (df/table *test-session* "NON_EXISTENT_TABLE_12345")
+                 (-> (df/table *session* "NON_EXISTENT_TABLE_12345")
                      (df/collect))))))
 
 (deftest test-select
   (testing "Select specific columns from dataframe"
     ;; Create test data and save to table
     (let [test-data (mg/generate [:vector {:gen/min 3 :gen/max 5} schemas/employee-schema])
-          temp-df (df/create-dataframe *test-session* test-data)]
+          temp-df (df/create-dataframe *session* test-data)]
 
       (testing "Select subset of columns"
         (let [result (df/select temp-df [:name :salary])
@@ -208,7 +188,7 @@
                      {:id 2 :name "Bob" :department "Engineering" :salary 85000}
                      {:id 3 :name "Charlie" :department "Marketing" :salary 60000}
                      {:id 4 :name "Diana" :department "Sales" :salary 70000}]
-          temp-df (df/create-dataframe *test-session* test-data)]
+          temp-df (df/create-dataframe *session* test-data)]
 
       (testing "Filter using column expression"
         ;; Filter for high salaries (> 70000)
@@ -246,7 +226,7 @@
   (testing "Limit number of rows returned from dataframe"
     ;; Create test data with enough rows to test limiting
     (let [test-data (mg/generate [:vector {:gen/min 5 :gen/max 8} schemas/employee-schema])
-          temp-df (df/create-dataframe *test-session* test-data)]
+          temp-df (df/create-dataframe *session* test-data)]
 
       (testing "Limit to specific number of rows"
         (let [limit-count 3
@@ -283,7 +263,7 @@
                      {:id 1 :name "Alice" :department "Marketing" :salary 75000}
                      {:id 4 :name "Diana" :department "Sales" :salary 70000}
                      {:id 2 :name "Bob" :department "Engineering" :salary 85000}]
-          temp-df (df/create-dataframe *test-session* test-data)]
+          temp-df (df/create-dataframe *session* test-data)]
 
       (testing "Sort by single column (ascending by default)"
         (let [result (df/df-sort temp-df :id)
@@ -337,7 +317,7 @@
                      {:id 4 :name "Diana" :department "Marketing" :salary 70000}
                      {:id 5 :name "Eve" :department "Sales" :salary 90000}
                      {:id 6 :name "Frank" :department "Sales" :salary 55000}]
-          dataframe (df/create-dataframe *test-session* test-data)]
+          dataframe (df/create-dataframe *session* test-data)]
 
       (testing "Group by single column with count aggregation"
         ;; Group by department and count employees in each department
@@ -401,7 +381,7 @@
                                 {:id 4 :name "Diana" :department "Marketing" :salary 70000 :experience "Senior"}
                                 {:id 5 :name "Eve" :department "Marketing" :salary 60000 :experience "Junior"}
                                 {:id 6 :name "Frank" :department "Sales" :salary 80000 :experience "Senior"}]
-              multi-df (df/create-dataframe *test-session* multi-group-data)
+              multi-df (df/create-dataframe *session* multi-group-data)
               
               ;; Group by both department AND experience level (multiple columns)
               grouped-df (df/df-group-by multi-df [:department :experience])
@@ -462,7 +442,7 @@
     (let [test-data [{:id 1 :name "Alice" :department "Engineering" :salary 75000}
                      {:id 2 :name "Bob" :department "Marketing" :salary 80000}
                      {:id 3 :name "Charlie" :department "Sales" :salary 65000}]
-          dataframe (df/create-dataframe *test-session* test-data)]
+          dataframe (df/create-dataframe *session* test-data)]
       
       (testing "Basic collect functionality"
         (let [collected (df/collect dataframe)]
@@ -522,7 +502,7 @@
     (let [test-data [{:id 1 :name "Alice" :department "Engineering" :salary 75000}
                      {:id 2 :name "Bob" :department "Marketing" :salary 80000}
                      {:id 3 :name "Charlie" :department "Sales" :salary 65000}]
-          dataframe (df/create-dataframe *test-session* test-data)]
+          dataframe (df/create-dataframe *session* test-data)]
       
       (testing "Basic show functionality"
         ;; show returns nil but prints output - we can test it doesn't throw
@@ -555,7 +535,7 @@
                      {:id 3 :name "Charlie" :department "Sales" :salary 65000}
                      {:id 4 :name "Diana" :department "HR" :salary 55000}
                      {:id 5 :name "Eve" :department "Engineering" :salary 90000}]
-          dataframe (df/create-dataframe *test-session* test-data)]
+          dataframe (df/create-dataframe *session* test-data)]
       
       (testing "Basic count functionality"
         (let [count-result (df/row-count dataframe)]
@@ -611,7 +591,7 @@
                      {:id 3 :name "Charlie" :department "Sales" :salary 65000}
                      {:id 4 :name "Diana" :department "HR" :salary 55000}
                      {:id 5 :name "Eve" :department "Engineering" :salary 90000}]
-          dataframe (df/create-dataframe *test-session* test-data)]
+          dataframe (df/create-dataframe *session* test-data)]
 
       (testing "Basic take functionality"
         (let [taken-rows (df/df-take dataframe 3)]

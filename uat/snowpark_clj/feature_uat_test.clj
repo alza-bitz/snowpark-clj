@@ -4,43 +4,18 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [malli.generator :as mg]
    [snowpark-clj.core :as sp]
+   [snowpark-clj.fixtures :refer [*session* session-fixture]]
    [snowpark-clj.schemas :as schemas]
    [snowpark-clj.wrapper :as wrapper]))
 
-;; Test data and schema
 (def test-data
   [{:id 1 :name "Alice" :department "Engineering" :salary 70000}
    {:id 2 :name "Bob" :department "Engineering" :salary 80000}
    {:id 3 :name "Charlie" :department "Sales" :salary 60000}])
 
-;; Test fixtures
-(def ^:dynamic *session* nil)
-(def test-table-name "SNOWPARK_CLJ_TEST_TABLE")
+(def test-table-name "SNOWPARK_CLJ_TEST_FEATURE_TABLE")
 
-(defn session-fixture
-  "Create a session for testing and clean up afterwards"
-  [f]
-  (let [session (sp/create-session "integration/snowflake.edn")]
-    (try
-      ;; Clean up any existing test table before running test
-      (try
-        (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
-        (catch Exception e
-          (println "Warning: Could not drop table:" (.getMessage e))))
-      (binding [*session* session] 
-        (f))
-      (finally
-        ;; Clean up: drop test table and close session
-        (try
-          (sp/sql session (str "DROP TABLE IF EXISTS " test-table-name))
-          (catch Exception e
-            (println "Warning: Could not drop table during cleanup:" (.getMessage e))))
-        (try
-          (sp/close-session session)
-          (catch Exception e
-            (println "Warning: Could not close session:" (.getMessage e))))))))
-
-(use-fixtures :each session-fixture)
+(use-fixtures :each (session-fixture "integration/snowflake.edn" test-table-name))
 
 ;; Feature 1 Integration Tests
 (deftest test-feature-1-create-and-save-dataframe
@@ -85,13 +60,12 @@
 
       ;; Read from table and apply transformations
       (let [table-df (sp/table *session* test-table-name)
-            salary-col (sp/col table-df :salary)
-            salary-condition (sp/gt salary-col (sp/lit 65000))
-            filtered-df (sp/filter table-df salary-condition)
-            selected-df (sp/select filtered-df [:name :salary])
-            sorted-df (sp/sort selected-df [:salary])
-            limited-df (sp/limit sorted-df 2)
-            results (sp/collect limited-df)]
+            results (-> table-df
+                        (sp/filter (sp/gt (sp/col table-df :salary) (sp/lit 65000)))
+                        (sp/select [:name :salary])
+                        (sp/sort :salary)
+                        (sp/limit 2)
+                        (sp/collect))]
 
         (is (vector? results))
         (is (<= (count results) 2))
