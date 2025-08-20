@@ -1,5 +1,54 @@
 (ns snowpark-clj.column)
 
+;; Functions to compare columns (Column instance methods)
+
+(defn gt
+  "Greater than comparison"
+  [col1 col2]
+  (.gt col1 col2))
+
+(defn lt
+  "Less than comparison" 
+  [col1 col2]
+  (.lt col1 col2))
+
+(defn eq
+  "Equal comparison"
+  [col1 col2]
+  (.equal_to col1 col2))
+
+(defn geq
+  "Greater than or equal comparison"
+  [col1 col2]
+  (.geq col1 col2))
+
+(defn leq
+  "Less than or equal comparison"
+  [col1 col2]
+  (.leq col1 col2))
+
+(defn neq
+  "Not equal comparison"
+  [col1 col2]
+  (.not_equal col1 col2))
+
+;; Functions for logical column operations (also Column instance methods)
+
+(defn and-fn
+  "Logical AND"
+  [col1 col2]
+  (.and col1 col2))
+
+(defn or-fn
+  "Logical OR"
+  [col1 col2]
+  (.or col1 col2))
+
+(defn not-fn
+  "Logical NOT"
+  [col]
+  (.not col))
+
 (defn parse-quoted
   "Parses the column name according to whether it is quoted or not."
   [col-name]

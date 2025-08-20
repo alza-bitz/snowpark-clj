@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
    [malli.generator :as mg]
+   [snowpark-clj.column :as col]
    [snowpark-clj.dataframe :as df]
    [snowpark-clj.fixtures :refer [*session* session-fixture]]
    [snowpark-clj.functions :as fn]
@@ -193,7 +194,7 @@
       (testing "Filter using column expression"
         ;; Filter for high salaries (> 70000)
         (let [salary-col (df/col temp-df :salary)
-              gt-70k (fn/gt salary-col (fn/lit 70000))
+              gt-70k (col/gt salary-col (fn/lit 70000))
               result (df/df-filter temp-df gt-70k)
               collected (df/collect result)]
 
@@ -213,7 +214,7 @@
       (testing "Filter using keyword column name"
         ;; Create a simple filter condition first
         (let [salary-col (df/col temp-df :salary)
-              eq-75k (fn/eq salary-col (fn/lit 75000))
+              eq-75k (col/eq salary-col (fn/lit 75000))
               result (df/df-filter temp-df eq-75k)
               collected (df/collect result)]
 
@@ -421,7 +422,7 @@
 
       (testing "Group by with filtering before grouping"
         ;; Filter high salary employees first, then group by department
-        (let [high-salary-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 70000)))
+        (let [high-salary-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 70000)))
               grouped-df (df/df-group-by high-salary-df :department)
               count-col (fn/count-fn (df/col high-salary-df :department))
               result-df (df/agg grouped-df count-col)
@@ -475,7 +476,7 @@
       
       (testing "Collect works with transformations"
         ;; Apply some transformations and collect
-        (let [filtered-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 70000)))
+        (let [filtered-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 70000)))
               collected (df/collect filtered-df)]
           
           ;; Should only get Alice and Bob (salary > 70000)
@@ -489,7 +490,7 @@
             (is (not (contains? names "Charlie"))))))
       
       (testing "Collect on empty result"
-        (let [empty-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 100000)))
+        (let [empty-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 100000)))
               collected (df/collect empty-df)]
           
           ;; Should return empty collection
@@ -518,12 +519,12 @@
       
       (testing "Show on empty dataframe"
         ;; Create an empty result and show it
-        (let [empty-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 100000)))]
+        (let [empty-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 100000)))]
           (is (nil? (df/show empty-df)))))
       
       (testing "Show works with transformations"
         ;; Apply transformations and show the result
-        (let [filtered-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 70000)))
+        (let [filtered-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 70000)))
               limited-df (df/limit filtered-df 1)]
           (is (nil? (df/show limited-df))))))))
 
@@ -545,7 +546,7 @@
       
       (testing "Count on empty dataframe"
         ;; Create an empty result by filtering with impossible condition
-        (let [empty-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 100000)))
+        (let [empty-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 100000)))
               count-result (df/row-count empty-df)]
           
           ;; Should return 0 for empty dataframe
@@ -553,7 +554,7 @@
       
       (testing "Count works with transformations"
         ;; Apply filter transformation and count
-        (let [filtered-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 70000)))
+        (let [filtered-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 70000)))
               count-result (df/row-count filtered-df)]
           
           ;; Should count only rows where salary > 70000 (Alice, Bob, Eve = 3 people)
@@ -625,7 +626,7 @@
 
       (testing "Take from empty dataframe"
         ;; Create an empty result by filtering with impossible condition
-        (let [empty-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 100000)))
+        (let [empty-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 100000)))
               taken-rows (df/df-take empty-df 5)]
 
           ;; Should return empty collection
@@ -634,7 +635,7 @@
 
       (testing "Take works with transformations"
         ;; Apply filter transformation and take
-        (let [filtered-df (df/df-filter dataframe (fn/gt (df/col dataframe :salary) (fn/lit 70000)))
+        (let [filtered-df (df/df-filter dataframe (col/gt (df/col dataframe :salary) (fn/lit 70000)))
               taken-rows (df/df-take filtered-df 2)]
 
           ;; Should take 2 rows from filtered result (high salary employees)
