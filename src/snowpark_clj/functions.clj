@@ -21,56 +21,7 @@
   [col]
   (Functions/count col))
 
-;; Comparison functions (these are Column instance methods)
-
-(defn gt
-  "Greater than comparison"
-  [col1 col2]
-  (.gt col1 col2))
-
-(defn lt
-  "Less than comparison" 
-  [col1 col2]
-  (.lt col1 col2))
-
-(defn eq
-  "Equal comparison"
-  [col1 col2]
-  (.equal_to col1 col2))
-
-(defn gte
-  "Greater than or equal comparison"
-  [col1 col2]
-  (.geq col1 col2))
-
-(defn lte
-  "Less than or equal comparison"
-  [col1 col2]
-  (.leq col1 col2))
-
-(defn neq
-  "Not equal comparison"
-  [col1 col2]
-  (.not_equal col1 col2))
-
-;; Logical functions (also Column instance methods)
-
-(defn and-fn
-  "Logical AND"
-  [col1 col2]
-  (.and col1 col2))
-
-(defn or-fn
-  "Logical OR"
-  [col1 col2]
-  (.or col1 col2))
-
-(defn not-fn
-  "Logical NOT"
-  [col]
-  (.not col))
-
-;; Math functions (these might be static on Functions)
+;; Math functions
 
 (defn abs-fn
   "Absolute value"

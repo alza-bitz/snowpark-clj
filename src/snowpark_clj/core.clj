@@ -1,15 +1,24 @@
 (ns snowpark-clj.core
   "Main API for Snowpark Clojure wrapper"
-  (:require [potemkin :refer [import-vars]] 
+  (:require [potemkin :refer [import-vars]]
+            [snowpark-clj.column :as col]
             [snowpark-clj.dataframe :as df]
             [snowpark-clj.functions :as fn]
             [snowpark-clj.schema]
             [snowpark-clj.session])
   (:refer-clojure :exclude [filter sort group-by take
-                            count and or not abs max min]))
+                            and not or abs count max min]))
 
 ;; Re-export functions from other layers with preserved docstrings and arglists
 (import-vars
+  [snowpark-clj.column 
+   gt
+   lt
+   eq
+   geq
+   leq
+   neq]
+
   [snowpark-clj.session
    create-session
    close-session]
@@ -35,16 +44,10 @@
   
   [snowpark-clj.functions 
    lit
-   gt
-   lt
-   eq
-   gte
-   lte
-   neq
-   upper
-   lower
    avg
-   sum])
+   sum
+   upper
+   lower])
 
 ;; Create clean aliases for prefixed functions that conflict with clojure.core
 ;; These preserve the original metadata (docstrings, arglists) from the prefixed versions
@@ -65,18 +68,16 @@
   take df/df-take)
 
 ;; Same as above but done declaratively / data-driven style
-(let [alias-mappings [['fn/count-fn 'count]
-                      ['fn/and-fn 'and]
-                      ['fn/or-fn 'or]
-                      ['fn/not-fn 'not]
+(let [alias-mappings [['col/and-fn 'and]
+                      ['col/not-fn 'not]
+                      ['col/or-fn 'or]
                       ['fn/abs-fn 'abs]
+                      ['fn/count-fn 'count]
                       ['fn/max-fn 'max]
                       ['fn/min-fn 'min]]]
   (doseq [[source-fn target-name] alias-mappings]
     (let [source-var (resolve source-fn)]
       (when source-var
-        (intern *ns* target-name
-                (with-meta @source-var
-                  (merge (meta source-var)
-                         {:arglists (:arglists (meta source-var))
-                          :doc (:doc (meta source-var))})))))))
+        (let [new-var (intern *ns* target-name @source-var)]
+          (alter-meta! new-var merge
+                       (select-keys (meta source-var) [:arglists :doc])))))))

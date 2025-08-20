@@ -10,6 +10,13 @@
              [:department [:enum "Engineering" "Marketing" "Sales"]]
              [:salary [:int {:min 50000 :max 100000}]]]))
 
+(def employee-schema-with-string-keys
+  (m/schema [:map
+             ["ID" :int]
+             ["NAME" :string]
+             ["DEPARTMENT" [:enum "Engineering" "Marketing" "Sales"]]
+             ["SALARY" [:int {:min 50000 :max 100000}]]]))
+
 (def employee-schema-with-optional-keys
   (m/schema [:map
              [:id :int]
