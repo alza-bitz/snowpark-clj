@@ -12,20 +12,20 @@
   (testing "Wrap session for session and dataframe is wrapped"
     (let [mock-session {:mock true}
           mock-dataframe {:mock true}]
-      (doseq [wrapper [(wrapper/wrap-session mock-session {:read-key-fn identity})
-                       (wrapper/wrap-dataframe mock-dataframe {:read-key-fn identity})]]
+      (doseq [wrapper [(wrapper/wrap-session mock-session {:col->key-fn identity})
+                       (wrapper/wrap-dataframe mock-dataframe {:col->key-fn identity})]]
         (is (wrapper/wrapper? wrapper)))))
 
   (testing "Wrap session for session and dataframe implements IWrappedSessionOptions"
     (let [mock-session {:mock true}
           mock-dataframe {:mock true}]
       (doseq [mock [mock-session mock-dataframe]
-              wrapper [(wrapper/wrap-session mock-session {:read-key-fn identity})
-                       (wrapper/wrap-dataframe mock-dataframe {:read-key-fn identity})]]
+              wrapper [(wrapper/wrap-session mock-session {:col->key-fn identity})
+                       (wrapper/wrap-dataframe mock-dataframe {:col->key-fn identity})]]
 
         (is (= mock (wrapper/unwrap wrapper)))
-        (is (= identity (wrapper/unwrap-option wrapper :read-key-fn)))
-        (is (= {:read-key-fn identity} (wrapper/unwrap-options wrapper)))))))
+        (is (= identity (wrapper/unwrap-option wrapper :col->key-fn)))
+        (is (= {:col->key-fn identity} (wrapper/unwrap-options wrapper)))))))
 
 (deftest test-wrap-session
   (testing "With open macro executes body and closes session"
@@ -60,8 +60,8 @@
   (testing "DataFrame wrapper supports map-like column access (feature 5)"
     (let [{:keys [mock-schema]} (mocks/mock-schema ["NAME" "SALARY" "AGE" "DEPARTMENT" "ID"])
           {:keys [mock-dataframe mock-dataframe-spies]} (mocks/mock-dataframe {:mock-schema mock-schema})
-          test-df (wrapper/wrap-dataframe mock-dataframe {:write-key-fn (comp str/upper-case name)
-                                                          :read-key-fn (comp keyword str/lower-case)})]
+          test-df (wrapper/wrap-dataframe mock-dataframe {:key->col-fn (comp str/upper-case name)
+                                                          :col->key-fn (comp keyword str/lower-case)})]
 
       (testing "IFn access: (df :column)"
         (let [result (test-df :name)]
@@ -86,10 +86,10 @@
         (let [field-count (clojure.core/count test-df)]
           (is (= 5 field-count))))
 
-      (testing "Iterable/Seqable access: (keys df) returns seq of encoded field names"
+      (testing "Iterable/Seqable access: (keys df) returns seq of transformed column names"
         (let [df-keys (keys test-df)]
           (is (= 5 (clojure.core/count df-keys)))
-          ;; Keys should be encoded using read-key-fn (keyword + lowercase)
+          ;; Keys should be transformed using col->key-fn (keyword + lowercase)
           (is (= #{:name :salary :age :department :id} (set df-keys)))))
 
       (testing "Iterable/Seqable access: (vals df) returns seq of column objects"
@@ -98,7 +98,7 @@
           ;; Each value should be a Column object
           (is (every? #(instance? com.snowflake.snowpark_java.Column %) df-vals))))
 
-      (testing "Iterable/Seqable access: (seq df) returns seq of MapEntry, each with the encoded field name and column object"
+      (testing "Iterable/Seqable access: (seq df) returns seq of MapEntry, each with the transformed field name and column object"
         (let [df-seq (seq test-df)]
           (is (= 5 (clojure.core/count df-seq)))
           ;; Each item should be a MapEntry object

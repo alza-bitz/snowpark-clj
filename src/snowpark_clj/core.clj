@@ -1,5 +1,5 @@
 (ns snowpark-clj.core
-  "Main API for Snowpark Clojure wrapper"
+  "The external API used by clients."
   (:require [potemkin :refer [import-vars]]
             [snowpark-clj.column :as col]
             [snowpark-clj.dataframe :as df]
@@ -24,7 +24,7 @@
    close-session]
  
   [snowpark-clj.schema
-   malli-schema->snowpark-schema]
+   malli->schema]
 
   [snowpark-clj.dataframe
    create-dataframe

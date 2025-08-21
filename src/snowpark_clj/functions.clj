@@ -1,5 +1,5 @@
 (ns snowpark-clj.functions
-  "Column functions and expressions for Snowpark"
+  "The internal API for Snowpark column functions and expressions."
   (:import [com.snowflake.snowpark_java Functions]))
 
 ;; Column creation functions

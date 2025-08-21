@@ -7,7 +7,7 @@ applyTo: '**'
 - For interactive development, use the REPL rather than the command line for checking that test namespaces load and checking the tests pass.
 - For property-based tests at unit or integration test scope, use `defspec` from `clojure.test.check`.
 - Property-based tests must be named `<property-based-test-name>-property`.
-- For spot checks, you can run the tests for a specific namespace using `clojure -M:<alias> -n <test-ns>`
+- For spot checks, you can run all the tests in a specific namespace using `clojure -M:<alias> -n <test-ns>` or you can run a specific test using `clojure -M:<alias> -v <test-ns>/<test-fn-name>`.
 
 # Unit tests
 - Unit tests must be placed in the `test` directory, with `-test` appended to the namespace of the functions under test.

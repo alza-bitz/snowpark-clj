@@ -13,17 +13,17 @@
   (:import
    [com.snowflake.snowpark_java.types DataTypes]))
 
-(defn- mock-session-wrapper [write-key-fn]
+(defn- mock-session-wrapper [key->col-fn]
   (let [mock (protocol/mock wrapper/IWrappedSessionOptions
-                            (unwrap-option [_ _] write-key-fn))]
+                            (unwrap-option [_ _] key->col-fn))]
     {:mock-session-wrapper mock
      :mock-session-wrapper-spies (protocol/spies mock)}))
 
 (deftest test-infer-schema
   (testing "Infer schema with no optional keys in schema"
     (let [data (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema])
-          write-key-fn (comp str/upper-case name)
-          {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
+          key->col-fn (comp str/upper-case name)
+          {:keys [mock-session-wrapper]} (mock-session-wrapper key->col-fn)
           result (schema/infer-schema mock-session-wrapper data)]
 
       (is (some? result))
@@ -40,8 +40,8 @@
 
   (testing "Infer schema with optional keys present as nil values"
     (let [data (mg/generate [:vector {:gen/min 1 :gen/max 5} schemas/employee-schema-with-nil-values])
-          write-key-fn (comp str/upper-case name)
-          {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
+          key->col-fn (comp str/upper-case name)
+          {:keys [mock-session-wrapper]} (mock-session-wrapper key->col-fn)
           result (schema/infer-schema mock-session-wrapper data)]
 
       (is (some? result))
@@ -53,11 +53,11 @@
                           #"Cannot infer schema from empty collection"
                           (schema/infer-schema (mock-session-wrapper (comp str/upper-case name)) [])))))
 
-(deftest test-malli-schema->snowpark-schema
+(deftest test-malli->schema
   (testing "Create schema from Malli schema with optional keys"
-    (let [write-key-fn (comp str/upper-case name)
-          {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
-          result (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema-with-optional-keys)]
+    (let [key->col-fn (comp str/upper-case name)
+          {:keys [mock-session-wrapper]} (mock-session-wrapper key->col-fn)
+          result (schema/malli->schema mock-session-wrapper schemas/employee-schema-with-optional-keys)]
 
       (is (some? result))
       (is (= 5 (count (.names result))))
@@ -74,28 +74,28 @@
   (testing "Create schema from Malli schema with invalid inputs"
     (is (thrown-with-msg? IllegalArgumentException
                           #"Input must be a valid Malli schema"
-                          (schema/malli-schema->snowpark-schema {} {:not :a-schema})))
+                          (schema/malli->schema {} {:not :a-schema})))
 
     (is (thrown-with-msg? IllegalArgumentException
                           #"Input must be a valid Malli schema"
-                          (schema/malli-schema->snowpark-schema {} [:string])))
+                          (schema/malli->schema {} [:string])))
 
     (is (thrown-with-msg? IllegalArgumentException
                           #"Only map schemas are supported"
-                          (schema/malli-schema->snowpark-schema {} (m/schema :string)))) 
+                          (schema/malli->schema {} (m/schema :string)))) 
 
-    (let [write-key-fn (comp str/upper-case name)
-          {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)]
+    (let [key->col-fn (comp str/upper-case name)
+          {:keys [mock-session-wrapper]} (mock-session-wrapper key->col-fn)]
       (is (thrown-with-msg? IllegalArgumentException
                           #"Unsupported schema"
-                          (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema-with-maybe-nil-values))))))
+                          (schema/malli->schema mock-session-wrapper schemas/employee-schema-with-maybe-nil-values))))))
 
 ;; Property-based test for schema inference consistency with no optional keys in schema
 (defspec schema-inference-consistency-property 20
   (prop/for-all [data (mg/generator [:vector {:gen/min 1 :gen/max 10} schemas/employee-schema])]
-                (let [write-key-fn (comp str/upper-case name)
-                      {:keys [mock-session-wrapper]} (mock-session-wrapper write-key-fn)
+                (let [key->col-fn (comp str/upper-case name)
+                      {:keys [mock-session-wrapper]} (mock-session-wrapper key->col-fn)
                       inferred-schema (schema/infer-schema mock-session-wrapper data)
-                      converted-schema (schema/malli-schema->snowpark-schema mock-session-wrapper schemas/employee-schema)]
+                      converted-schema (schema/malli->schema mock-session-wrapper schemas/employee-schema)]
                   ;; Both schemas should have the same field names in the same order
                   (= (vec (.names inferred-schema)) (vec (.names converted-schema))))))

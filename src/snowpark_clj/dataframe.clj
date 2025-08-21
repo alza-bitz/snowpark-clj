@@ -14,33 +14,32 @@
 
 (defn- to-column-names
   "Category 1: For Snowpark methods that only take string column names.
-   Accepts encoded column names that will be decoded using write-key-fn, returns string array."
-  [cols write-key-fn]
-  (let [normalized-cols (normalize-to-vector cols)
-        decoded-cols (map write-key-fn normalized-cols)]
-    (into-array String decoded-cols)))
+   Accepts column keys that will be transformed using key->col-fn, returns string array."
+  [cols key->col-fn]
+  (let [normalized-cols (normalize-to-vector cols)]
+    (into-array String (map key->col-fn normalized-cols))))
 
 (defn- to-columns
   "Category 2: For Snowpark methods that only take Column objects.
-   Accepts Column objects or encoded column names that will be decoded using write-key-fn, returns Column array."
-  [cols write-key-fn raw-df]
+   Accepts Column objects or column keys that will be transformed using key->col-fn, returns Column array."
+  [cols key->col-fn raw-df]
   (let [normalized-cols (normalize-to-vector cols)
         column-objects (map (fn [col]
                               (if (instance? com.snowflake.snowpark_java.Column col)
                                 col
-                                (.col raw-df (write-key-fn col))))
+                                (.col raw-df (key->col-fn col))))
                             normalized-cols)]
     (into-array com.snowflake.snowpark_java.Column column-objects)))
 
 (defn- to-columns-or-names
   "Category 3: For Snowpark methods that take either strings or Columns.
-   Returns appropriate array (String[] or Column[]) based on whether cols are encoded column names that will be decoded using write-key-fn or Column objects."
-  [cols write-key-fn]
+   Returns appropriate array (String[] or Column[]) based on whether cols are Column objects or column keys that will be transformed using key->col-fn."
+  [cols key->col-fn]
   (let [normalized-cols (normalize-to-vector cols)
         first-col (first normalized-cols)]
     (if (instance? com.snowflake.snowpark_java.Column first-col)
       (into-array com.snowflake.snowpark_java.Column normalized-cols)
-      (into-array String (map write-key-fn normalized-cols)))))
+      (into-array String (map key->col-fn normalized-cols)))))
 
 ;; Dataframe creation functions
 
@@ -67,8 +66,8 @@
    (when (empty? data)
      (throw (IllegalArgumentException. "Cannot create dataframe from empty data"))) 
    (let [raw-session (wrapper/unwrap session)
-         write-key-fn (wrapper/unwrap-option session :write-key-fn)
-         rows (convert/maps->rows data schema write-key-fn)
+         key->col-fn (wrapper/unwrap-option session :key->col-fn)
+         rows (convert/maps->rows data schema key->col-fn)
          dataframe (.createDataFrame raw-session rows schema)]
      (wrapper/wrap-dataframe dataframe (wrapper/unwrap-options session)))))
 
@@ -105,13 +104,13 @@
    
    Args:
    - df: Dataframe wrapper
-   - cols: Single column or vector of columns (Column objects or encoded column names that will be decoded using write-key-fn)
+   - cols: Single column or vector of columns (Column objects or column keys that will be transformed using key->col-fn)
    
    Returns: A dataframe wrapper"
   [df cols]
   (let [raw-df (wrapper/unwrap df)
-        write-key-fn (wrapper/unwrap-option df :write-key-fn)
-        col-array (to-columns-or-names cols write-key-fn)
+        key->col-fn (wrapper/unwrap-option df :key->col-fn)
+        col-array (to-columns-or-names cols key->col-fn)
         result-df (.select raw-df col-array)]
     (wrapper/wrap-dataframe result-df (wrapper/unwrap-options df))))
 
@@ -120,15 +119,15 @@
    
    Args:
    - df: Dataframe wrapper
-   - condition: Column object or encoded column name that will be decoded using write-key-fn
+   - condition: Column object or column key that will be transformed using key->col-fn
    
    Returns: A dataframe wrapper"
   [df condition]
   (let [raw-df (wrapper/unwrap df)
-        write-key-fn (wrapper/unwrap-option df :write-key-fn)
+        key->col-fn (wrapper/unwrap-option df :key->col-fn)
         col-condition (if (instance? com.snowflake.snowpark_java.Column condition)
                         condition
-                        (.col raw-df (write-key-fn condition)))
+                        (.col raw-df (key->col-fn condition)))
         result-df (.filter raw-df col-condition)]
     (wrapper/wrap-dataframe result-df (wrapper/unwrap-options df))))
 
@@ -155,13 +154,13 @@
    
    Args:
    - df: Dataframe wrapper
-   - cols: Single column or vector of columns (Column objects or encoded column names that will be decoded using write-key-fn)
+   - cols: Single column or vector of columns (Column objects or column keys that will be transformed using key->col-fn)
    
    Returns: A dataframe wrapper"
   [df cols]
   (let [raw-df (wrapper/unwrap df)
-        write-key-fn (wrapper/unwrap-option df :write-key-fn)
-        col-array (to-columns cols write-key-fn raw-df)
+        key->col-fn (wrapper/unwrap-option df :key->col-fn)
+        col-array (to-columns cols key->col-fn raw-df)
         result-df (.sort raw-df col-array)]
     (wrapper/wrap-dataframe result-df (wrapper/unwrap-options df))))
 
@@ -170,13 +169,13 @@
    
    Args:
    - df: Dataframe wrapper
-   - cols: Single column or vector of columns (Column objects or encoded column names that will be decoded using write-key-fn)
+   - cols: Single column or vector of columns (Column objects or column keys that will be transformed using key->col-fn)
    
    Returns: A grouped dataframe wrapper"
   [df cols]
   (let [raw-df (wrapper/unwrap df)
-        write-key-fn (wrapper/unwrap-option df :write-key-fn)
-        col-array (to-columns-or-names cols write-key-fn)
+        key->col-fn (wrapper/unwrap-option df :key->col-fn)
+        col-array (to-columns-or-names cols key->col-fn)
         result-grouped-df (.groupBy raw-df col-array)]
     (wrapper/wrap-grouped result-grouped-df (wrapper/unwrap-options df))))
 
@@ -185,13 +184,13 @@
    
    Args:
    - df: Dataframe wrapper
-   - cols: Single column or vector of columns (Column objects or encoded column names that will be decoded using write-key-fn)
+   - cols: Single column or vector of columns (Column objects or column keys that will be transformed using key->col-fn)
 
    Returns: a dataframe wrapper"
   [df cols]
   (let [raw-df (wrapper/unwrap df)
-        write-key-fn (wrapper/unwrap-option df :write-key-fn)
-        col-array (to-columns-or-names cols write-key-fn)
+        key->col-fn (wrapper/unwrap-option df :key->col-fn)
+        col-array (to-columns-or-names cols key->col-fn)
         result-df (.agg raw-df col-array)]
     (wrapper/wrap-dataframe result-df (wrapper/unwrap-options df))))
 
@@ -228,13 +227,13 @@
    Args:
    - df: Dataframe wrapper
    
-   Returns: Vector of maps with keys encoded using read-key-fn"
+   Returns: Vector of maps with column names transformed using col->key-fn"
   [df]
   (let [raw-df (wrapper/unwrap df)
-        read-key-fn (wrapper/unwrap-option df :read-key-fn)
+        col->key-fn (wrapper/unwrap-option df :col->key-fn)
         rows-array (.collect raw-df)
         schema (.schema raw-df)]
-    (convert/rows->maps rows-array schema read-key-fn)))
+    (convert/rows->maps rows-array schema col->key-fn)))
 
 (defn show
   "Display dataframe contents (limited number of rows).
@@ -267,7 +266,7 @@
    - df: Dataframe wrapper
    - n: Number of rows to take
    
-   Returns: Vector of maps with keys encoded using read-key-fn"
+   Returns: Vector of maps with column names transformed using col->key-fn"
   [df n]
   (let [limited-df (limit df n)]
     (collect limited-df)))
@@ -316,14 +315,13 @@
    
    Args:
    - df: Dataframe wrapper
-   - col-name: encoded column name (will be decoded using write-key-fn)
+   - col-name: column key (will be transformed using key->col-fn)
    
    Returns: Snowpark Column object"
   [df col-name]
   (let [raw-df (wrapper/unwrap df)
-        write-key-fn (wrapper/unwrap-option df :write-key-fn)
-        decoded-name (write-key-fn col-name)]
-    (.col raw-df decoded-name)))
+        key->col-fn (wrapper/unwrap-option df :key->col-fn)]
+    (.col raw-df (key->col-fn col-name))))
 
 ;; Utility functions
 

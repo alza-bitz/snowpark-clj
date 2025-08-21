@@ -1,4 +1,4 @@
-{:paths ["src"]
+{:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"} 
         aero/aero {:mvn/version "1.1.6"}
         com.github.igrishaev/mask {:mvn/version "0.1.1"}
@@ -6,7 +6,7 @@
         metosin/malli {:mvn/version "0.19.1"}
         potemkin/potemkin {:mvn/version "0.4.6"}}
  :aliases
- {:dev {:extra-paths ["dev" "test" "integration"]
+ {:dev {:extra-paths ["dev" "test" "integration" "uat"]
         :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
                      org.clojure/tools.namespace {:mvn/version "1.5.0"}
                      tortue/spy {:mvn/version "2.15.0"}}

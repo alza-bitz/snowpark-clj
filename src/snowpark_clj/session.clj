@@ -17,23 +17,23 @@
   (Session/builder))
 
 (def default-opts
-  {:read-key-fn (comp keyword str/lower-case col/quoted)
-   :write-key-fn (comp str/upper-case name)})
+  {:col->key-fn (comp keyword str/lower-case col/quoted)
+   :key->col-fn (comp str/upper-case name)})
 
 (defn create-session
-  "Create a session from a map or edn file config, with optional column name encoding and decoding functions.
+  "Create a session from a map or edn file config, with optional key<->column transformation functions.
       
    Args:
-   - config: Map or the path of an edn file, either must conform to config/config-schema
+   - config: Map or the path of an edn file, either must conform to `snowpark-clj.config/config-schema`
    - opts: Map that can include:
-     - :read-key-fn - function to encode column names on dataset read operations
-     - :write-key-fn - function to decode column names on dataset write operations
+     - :col->key-fn - function to transform column names on dataset read operations
+     - :key->col-fn - function to transform map keys on dataset write operations
    
    Returns: A session wrapper with the session options"
   ([config]
    (create-session config {}))
-  ([config {:keys [read-key-fn write-key-fn] :or {read-key-fn (:read-key-fn default-opts)
-                                                  write-key-fn (:write-key-fn default-opts)} :as opts}]
+  ([config {:keys [col->key-fn key->col-fn] :or {col->key-fn (:col->key-fn default-opts)
+                                                 key->col-fn (:key->col-fn default-opts)} :as opts}]
    (let [loaded-config (if (string? config)
                          (config/read-config config)
                          config)
@@ -47,8 +47,8 @@
          builder (create-session-builder)
          configured-builder (.configs builder config-map)
          session (.create configured-builder)]
-     (wrapper/wrap-session session (merge {:read-key-fn read-key-fn
-                                           :write-key-fn write-key-fn}
+     (wrapper/wrap-session session (merge {:col->key-fn col->key-fn
+                                           :key->col-fn key->col-fn}
                                           opts)))))
 
 (defn close-session

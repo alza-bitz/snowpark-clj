@@ -9,9 +9,11 @@ applyTo: '**'
 Although the Snowpark library has Java and Scala bindings, it doesn't provide anything for Clojure. As such, it's currently not possible to interact with Snowflake using the Clojure way. It would be useful if such a wrapper existed, to enable all kinds of Snowflake use cases directly from the Clojure REPL.
 
 ## Global requirements
-As a Clojure wrapper for an existing Java API:
-1. To aid those who are familiar with Snowflake and the Snowpark API, the same concepts should be presented (session, dataframe, etc).
-2. To aid those who are familiar with Clojure, the external API should be idiomatic Clojure.
+1. It will be a proof-of-concept, covering the essential parts of the underlying API without being too concerned with performance or completeness.
+1. More specifically, in the beginning it will only support reading and writing data from local memory rather than from a Snowflake stage, and it will only support password authentication.
+1. The purpose is to demonstrate the validity of the approach as a foundation for enabling a wide range of data science or engineering use cases from the Clojure REPL, in situations where Snowflake is the data warehouse of choice.
+1. To aid those who are familiar with Snowflake and the Snowpark API, the same concepts should be presented with the same names (session, dataframe, etc).
+1. To aid those who are familiar with Clojure, the external API should be idiomatic Clojure.
 
 ## Snowpark considerations
 - Snowpark sessions are mutable and not thread-safe.
@@ -66,7 +68,7 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 ## Features that are planned but have not yet been elaborated
 - Support for adding column(s) to a dataset
 - Support for joins
-- Streaming read: local row iterator / transducer 
+- Streaming read: wrap DataFrame.toLocalIterator() as a reducible coll for processing with transducers
 - Streaming write?
 - Load data from stage using DataFrameReader
 - Save data to stage using DataFrameWriter

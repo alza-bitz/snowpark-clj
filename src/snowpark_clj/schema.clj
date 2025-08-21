@@ -1,4 +1,5 @@
 (ns snowpark-clj.schema
+  "The internal API for Snowpark schema functions."
   (:require
    [malli.core :as m]
    [snowpark-clj.wrapper :as wrapper]) 
@@ -27,7 +28,7 @@
    will be determined by (seq (first data)). All inferred fields will be nullable.
    
    Args:
-   - session: Session wrapper including :write-key-fn for decoding schema field names
+   - session: Session wrapper including :key->col-fn for decoding schema field names
    - data: Collection of maps representing rows to infer schema from
    
    Returns a StructType representing the schema."
@@ -35,10 +36,10 @@
   (when (empty? data)
     (throw (IllegalArgumentException. "Cannot infer schema from empty collection")))
 
-  (let [write-key-fn (wrapper/unwrap-option session :write-key-fn)
+  (let [key->col-fn (wrapper/unwrap-option session :key->col-fn)
         sample-map (first data)
         fields (for [[k v] sample-map]
-                 (StructField. (write-key-fn k) (clojure-value->data-type v) true))]
+                 (StructField. (key->col-fn k) (clojure-value->data-type v) true))]
     (StructType. (into-array StructField fields))))
 
 
@@ -77,7 +78,7 @@
     ;; Default fallback
     :else (throw (IllegalArgumentException. (str "Unsupported schema: " malli-type)))))
 
-(defn malli-schema->snowpark-schema
+(defn malli->schema
   "Create a Snowpark schema from a Malli schema.
    
    Supports map schemas like:
@@ -87,7 +88,7 @@
     [:active :boolean]]
    
    Args:
-   - session: Session wrapper including :write-key-fn for decoding schema field names
+   - session: Session wrapper including :key->col-fn for decoding schema field names
    - malli-schema: Malli schema
     
    Returns a StructType that can be used with Snowpark DataFrames."
@@ -107,7 +108,7 @@
                                          (first field-rest)
                                          {})
                          snowpark-type (malli-type->data-type field-type)
-                         write-key-fn (wrapper/unwrap-option session :write-key-fn)]
-                     (StructField. (write-key-fn field-name) snowpark-type (or (:optional field-options) false))))]
+                         key->col-fn (wrapper/unwrap-option session :key->col-fn)]
+                     (StructField. (key->col-fn field-name) snowpark-type (or (:optional field-options) false))))]
       (StructType. (into-array StructField fields)))))
 
