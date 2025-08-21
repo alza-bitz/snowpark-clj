@@ -21,8 +21,8 @@
 
       ;; Verify the result is properly wrapped
       (is (wrapper/wrapper? result))
-      (is (= ((wrapper/unwrap-option result :read-key-fn) "TEST_COLUMN") :test_column))
-      (is (= ((wrapper/unwrap-option result :write-key-fn) :test_column) "TEST_COLUMN"))      ;; Verify we can get basic info from the dataframe
+      (is (= ((wrapper/unwrap-option result :col->key-fn) "TEST_COLUMN") :test_column))
+      (is (= ((wrapper/unwrap-option result :key->col-fn) :test_column) "TEST_COLUMN"))      ;; Verify we can get basic info from the dataframe
       (let [schema (df/schema result)]
         (is (some? schema))
         ;; Schema should have the expected fields
@@ -35,7 +35,7 @@
       ;; Verify we can collect the data back
       (let [collected (df/collect result)]
         (is (= (count data) (count collected)))
-        ;; Check that keys are properly transformed by read-key-fn
+        ;; Check that keys are properly transformed by col->key-fn
         (is (every? keyword? (mapcat keys collected)))
         ;; Check that we have the expected keys
         (is (every? #(contains? % :id) collected))
@@ -51,8 +51,8 @@
 
       ;; Verify the result is properly wrapped
       (is (wrapper/wrapper? result))
-      (is (= ((wrapper/unwrap-option result :read-key-fn) "TEST_COLUMN") :test_column))
-      (is (= ((wrapper/unwrap-option result :write-key-fn) :test_column) "TEST_COLUMN"))
+      (is (= ((wrapper/unwrap-option result :col->key-fn) "TEST_COLUMN") :test_column))
+      (is (= ((wrapper/unwrap-option result :key->col-fn) :test_column) "TEST_COLUMN"))
 
       ;; Verify the schema matches what we provided
       (let [result-schema (df/schema result)]
@@ -67,7 +67,7 @@
       ;; Verify we can collect the data back
       (let [collected (df/collect result)]
         (is (= (count data) (count collected)))
-        ;; Check that keys are properly transformed by read-key-fn
+        ;; Check that keys are properly transformed by col->key-fn
         (is (every? keyword? (mapcat keys collected))))))
 
   (testing "Create dataframe from empty data should throw exception"
@@ -111,8 +111,8 @@
 
         ;; Verify the result is properly wrapped
         (is (wrapper/wrapper? result))
-        (is (= ((wrapper/unwrap-option result :read-key-fn) "TEST_COLUMN") :test_column))
-        (is (= ((wrapper/unwrap-option result :write-key-fn) :test_column) "TEST_COLUMN"))
+        (is (= ((wrapper/unwrap-option result :col->key-fn) "TEST_COLUMN") :test_column))
+        (is (= ((wrapper/unwrap-option result :key->col-fn) :test_column) "TEST_COLUMN"))
 
         ;; Verify we can get schema info
         (let [schema (df/schema result)]
@@ -126,7 +126,7 @@
         ;; Verify we can collect the data
         (let [collected (df/collect result)]
           (is (= (count test-data) (count collected)))
-          ;; Check that keys are properly transformed by read-key-fn
+          ;; Check that keys are properly transformed by col->key-fn
           (is (every? keyword? (mapcat keys collected)))
           ;; Check data integrity by comparing sorted results
           (let [original-sorted (sort-by :id test-data)

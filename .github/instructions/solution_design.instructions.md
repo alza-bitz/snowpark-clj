@@ -72,6 +72,7 @@ The library should implement the following layers as namespaces:
 - Geni, a Clojure wrapper for Spark Dataframes: https://github.com/zero-one-group/geni
 
 # All layers
+- Namespace docstrings should match the description of each layer in the instruction files.
 - Don't hard-code the defaults for read-key-fn or write-key-fn anywhere in the code, either in part or in full. As in, no hard-coding of keyword, keyword?, name, str/upper-case, str/lower-case etc. Regarding tests, hard-coding is acceptable for unit tests, but not for integration tests.
 - The names of any vars that are passed as args to functions should match the name of the args, if possible.
 - Don't create any namespaces with the same name.
@@ -83,6 +84,7 @@ The library should implement the following layers as namespaces:
 # All layers: all tests
 - When implementing features 1 & 2, use the schema suggested by test_data.csv as the schema for all the tests.
 - When implementing feature 3 onwards, create a Malli schema based on test_data.csv and use that to generate test data.
+- When implementing dataframe tests that compose multiple transformation operations, prefer threading macros where possible.
 - Since we are using Malli for this solution, use Malli for all generation of test data, rather than clojure.test.check.
 
 # All layers: unit tests
@@ -91,10 +93,14 @@ The library should implement the following layers as namespaces:
 - If real column objects are required by the function under test, they can be created using Functions.col(..).
 
 # All layers: integration tests
-- Use test fixtures to create a session before running each test and to ensure any tables saved by tests are deleted after each test.
+- Use test fixtures to create a session before running each test and ensure any saved tables are deleted afterwards.
 - Use my trial Snowflake account by creating a session with a snowflake.edn file.
+- To run the these tests using the command line, the Snowflake password will need to be exported using `source ./export-secrets.sh`.
 
 # All layers: uat tests
 - Every feature from the requirements instructions should have a single test named `test-feature-n-<description>`.
 - These tests must use the external API, as in the core namespace and not the other internal namespaces directly.
-- Use test fixtures and my trial Snowflake account as per the instructions written above for integration tests.
+- Use test fixtures, my trial Snowflake account and export secrets script as per the instructions for integration tests.
+
+# All layers: performance tests, profiling and benchmarking
+- TODO

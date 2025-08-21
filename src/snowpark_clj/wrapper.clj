@@ -48,13 +48,12 @@
       (valAt [this k]
         (.valAt this k nil))
       (valAt [_ k not-found]
-        (let [write-key-fn (:write-key-fn base-map)
-              decoded-name (write-key-fn k)
+        (let [key->col-fn (:key->col-fn base-map)
               raw-df (:dataframe base-map)
               schema (.schema raw-df)
               field-names (set (.names schema))]
-          (if (contains? field-names decoded-name)
-            (.col raw-df decoded-name)
+          (if (contains? field-names (key->col-fn k))
+            (.col raw-df (key->col-fn k))
             not-found)))
 
       clojure.lang.IFn
@@ -74,12 +73,11 @@
 
       clojure.lang.Associative
       (containsKey [_ k]
-        (let [write-key-fn (:write-key-fn base-map)
-              decoded-name (write-key-fn k)
+        (let [key->col-fn (:key->col-fn base-map)
               raw-df (:dataframe base-map)
               schema (.schema raw-df)
               field-names (set (.names schema))]
-          (contains? field-names decoded-name)))
+          (contains? field-names (key->col-fn k))))
       (entryAt [this k]
         (when (.containsKey this k)
           (clojure.lang.MapEntry. k (.valAt this k))))
@@ -98,15 +96,14 @@
 
       clojure.lang.Seqable
       (seq [_]
-        ;; Return a seq of MapEntry objects, each containing the encoded field name and column object
+        ;; Return a seq of MapEntry objects, each containing the transformed field name and column object
         (let [raw-df (:dataframe base-map)
               schema (.schema raw-df)
               field-names (.names schema)
-              read-key-fn (:read-key-fn base-map)]
+              col->key-fn (:col->key-fn base-map)]
           (map (fn [field-name]
-                 (let [encoded-name (read-key-fn field-name)
-                       column-obj (.col raw-df field-name)]
-                   (clojure.lang.MapEntry. encoded-name column-obj)))
+                 (let [column-obj (.col raw-df field-name)]
+                   (clojure.lang.MapEntry. (col->key-fn field-name) column-obj)))
                field-names)))
 
       ;; Additional map-like operations for DataFrame columns

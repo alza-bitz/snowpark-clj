@@ -61,8 +61,8 @@
           ;; Verify the result is properly wrapped
           (is (wrapper/wrapper? result))
           ;; Check that the functions work correctly, not that they equal specific functions
-          (is (= :test ((wrapper/unwrap-option result :read-key-fn) "TEST")))
-          (is (= "TEST" ((wrapper/unwrap-option result :write-key-fn) :test)))
+          (is (= :test ((wrapper/unwrap-option result :col->key-fn) "TEST")))
+          (is (= "TEST" ((wrapper/unwrap-option result :key->col-fn) :test)))
           (is (= "mock-session" (wrapper/unwrap result)))
 
           ;; Verify the builder methods were called correctly
@@ -87,8 +87,8 @@
           ;; Verify the result is properly wrapped
           (is (wrapper/wrapper? result))
           ;; Check that the functions work correctly, not that they equal specific functions
-          (is (= :test ((wrapper/unwrap-option result :read-key-fn) "TEST")))
-          (is (= "TEST" ((wrapper/unwrap-option result :write-key-fn) :test)))
+          (is (= :test ((wrapper/unwrap-option result :col->key-fn) "TEST")))
+          (is (= "TEST" ((wrapper/unwrap-option result :key->col-fn) :test)))
           (is (= "mock-session" (wrapper/unwrap result)))
 
           (assert/called-once? aero/read-config)

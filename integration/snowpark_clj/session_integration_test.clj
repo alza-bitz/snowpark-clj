@@ -30,8 +30,8 @@
       (with-open [result (session/create-session test-config-with-password)]
         (is (wrapper/wrapper? result))
         ;; Test session options
-        (is (fn? (wrapper/unwrap-option result :read-key-fn)))  ; Test it's a function rather than specific function
-        (is (fn? (wrapper/unwrap-option result :write-key-fn))) ; Test it's a function rather than specific function
+        (is (fn? (wrapper/unwrap-option result :col->key-fn)))  ; Test it's a function rather than specific function
+        (is (fn? (wrapper/unwrap-option result :key->col-fn))) ; Test it's a function rather than specific function
 
         (is (string? (.getSessionInfo (wrapper/unwrap result))))
         (is (= (quote-string (:db test-config-with-password))
@@ -41,11 +41,11 @@
 
   (testing "Create session from config as map with custom options"
     (with-open [result (session/create-session (assoc-password test-config)
-                                               {:read-key-fn identity
-                                                :write-key-fn str/upper-case})]
+                                               {:col->key-fn identity
+                                                :key->col-fn str/upper-case})]
       (is (wrapper/wrapper? result))
-      (is (= identity (wrapper/unwrap-option result :read-key-fn)))
-      (is (= str/upper-case (wrapper/unwrap-option result :write-key-fn)))))
+      (is (= identity (wrapper/unwrap-option result :col->key-fn)))
+      (is (= str/upper-case (wrapper/unwrap-option result :key->col-fn)))))
 
   (testing "Create session from config as map with incorrect url"
     (is (thrown? Exception (session/create-session (assoc test-config :url "http://haha.com")))))

@@ -29,8 +29,8 @@
       (is (some? dataframe))
       (is (map? dataframe))
       (is (wrapper/unwrap dataframe))
-      (is (wrapper/unwrap-option dataframe :read-key-fn))
-      (is (wrapper/unwrap-option dataframe :write-key-fn))
+      (is (wrapper/unwrap-option dataframe :col->key-fn))
+      (is (wrapper/unwrap-option dataframe :key->col-fn))
 
       ;; Check schema
       (let [schema (sp/schema dataframe)]
