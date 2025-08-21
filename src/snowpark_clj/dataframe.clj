@@ -232,9 +232,9 @@
   [df]
   (let [raw-df (wrapper/unwrap df)
         read-key-fn (wrapper/unwrap-option df :read-key-fn)
-        collected-rows (.collect raw-df)
+        rows-array (.collect raw-df)
         schema (.schema raw-df)]
-    (convert/rows->maps collected-rows schema read-key-fn)))
+    (convert/rows->maps rows-array schema read-key-fn)))
 
 (defn show
   "Display dataframe contents (limited number of rows).
