@@ -18,9 +18,9 @@ The library should implement the following layers as namespaces:
 - It should provide a create-session function giving two ways to create a session, depending on the type of the mandatory config argument.
 - If the config arg is a string, it is assumed to be the path of an edn file that is expected to conform to a Malli config schema when loaded. The Aero library should be used to load the config, validated with Malli and then passed to SessionBuilder.configs().
 - Otherwise the config arg is assumed to be a map that is expected to conform to a Malli config schema. The config should be validated with Malli and then passed to SessionBuilder.configs().
-- The create-session function must also provide an optional map argument that can include two options, read-key-fn which is a function to transform column names on dataset read operations, and write-key-fn which is a function to transform column names on dataset write (or create) operations.
-- The default value of read-key-fn will be `(comp keyword str/lower-case)` and the default value of write-key-fn will be `(comp str/upper-case name)`, as in, read-key-fn is the inverse of write-key-fn.
-- Although read-key-fn and write-key-fn are specified by the session, these functions should be passed to the convert layer functions and exclusively used there.
+- The create-session function must also provide an optional map argument that can include two options, col->key-fn which is a function to transform column names on dataset read operations, and key->col-fn which is a function to transform column names on dataset write (or create) operations.
+- The default value of col->key-fn will be `(comp keyword str/lower-case)` and the default value of key->col-fn will be `(comp str/upper-case name)`, as in, col->key-fn is the inverse of key->col-fn.
+- Although col->key-fn and key->col-fn are specified by the session, these functions should be passed to the convert layer functions and exclusively used there.
 - The create-session function must return a map wrapping the session and the options.
 
 # Config layer
@@ -32,11 +32,11 @@ The library should implement the following layers as namespaces:
 
 # Schema layer
 - The internal API for Snowpark schema functions.
-- It should include a function for inferring a Snowpark schema from a coll of Clojure maps and a wrapped session providing write-key-fn.
+- It should include a function for inferring a Snowpark schema from a coll of Clojure maps and a wrapped session providing key->col-fn.
 - When inferring a schema, map keys must result in a StructField with nullable=true, regardless of the value.
-- It should include a function for creating a Snowpark schema from a Malli schema and a wrapped session providing write-key-fn.
+- It should include a function for creating a Snowpark schema from a Malli schema and a wrapped session providing key->col-fn.
 - When creating a schema from a Malli schema, required keys must result in a StructField with nullable=false, and optional keys must result in a StructField with nullable=true.
-- All schema field name conversions must be done with read-key-fn and write-key-fn functions only.
+- All schema field name conversions must be done with col->key-fn and key->col-fn functions only.
 
 # Dataframe layer
 - The internal API for Snowpark dataframe functions.
@@ -45,10 +45,10 @@ The library should implement the following layers as namespaces:
 - The first way is without a schema arg, for development convenience. In this case the schema should be inferred from the first row.
 - The second way is with a schema arg, as expected by `Session.createDataFrame(..)`
 - The create-dataframe function must return a map wrapping the dataframe and the options from the session.
-- Any functions that need to convert from Snowpark to Clojure or back again must use the read-key-fn or write-key-fn options from the wrapped dataset as appropriate.
-- Any functions wrapping Snowpark methods that only take one or more string column name args, e.g. col(..), toDF(..), must be consistent in what will be accepted: values that will be given to write-key-fn before calling the wrapped method.
-- Any functions wrapping Snowpark methods that only take one or more column object args, e.g. filter(..), sort(..), must be consistent in what will be accepted: either column objects that will be passed to the wrapped method, or values that will be given to write-key-fn and column objects created, before calling the wrapped method.
-- Any functions wrapping Snowpark methods that take either string column name or column object args, e.g. select(..), groupBy(..), must be consistent in what will be accepted: either column objects that will be passed to the wrapped method, or values that will be given to write-key-fn before calling the wrapped method.
+- Any functions that need to convert from Snowpark to Clojure or back again must use the col->key-fn or key->col-fn options from the wrapped dataset as appropriate.
+- Any functions wrapping Snowpark methods that only take one or more string column name args, e.g. col(..), toDF(..), must be consistent in what will be accepted: values that will be given to key->col-fn before calling the wrapped method.
+- Any functions wrapping Snowpark methods that only take one or more column object args, e.g. filter(..), sort(..), must be consistent in what will be accepted: either column objects that will be passed to the wrapped method, or values that will be given to key->col-fn and column objects created, before calling the wrapped method.
+- Any functions wrapping Snowpark methods that take either string column name or column object args, e.g. select(..), groupBy(..), must be consistent in what will be accepted: either column objects that will be passed to the wrapped method, or values that will be given to key->col-fn before calling the wrapped method.
 - All functions must be implemented without using string SQL expressions where possible.
 - Any functions wrapping Snowpark dataframe creation methods must return a map wrapping the dataframe and the options from the session wrapper.
 - Any functions wrapping Snowpark eager transformation methods must return a map wrapping the dataframe and the options from the dataframe wrapper.
@@ -62,9 +62,9 @@ The library should implement the following layers as namespaces:
 # Convert layer
 - The internal API for data conversion functions.
 - It should include functions for converting data from Clojure maps to Snowpark rows and back again.
-- All conversion functions must take read-key-fn or write-key-fn args as appropriate and use those functions when converting.
-- All table column name conversions must be done with read-key-fn and write-key-fn functions only.
-- The read-key-fn and write-key-fn args are required, not optional, so they don't need to be defaulted.
+- All conversion functions must take col->key-fn or key->col-fn args as appropriate and use those functions when converting.
+- All table column name conversions must be done with col->key-fn and key->col-fn functions only.
+- The col->key-fn and key->col-fn args are required, not optional, so they don't need to be defaulted.
 - When converting from maps to rows, it must handle nullable fields by including a nil value for the column index.
 - When converting from rows to maps, it must handle nullable fields by excluding the key for the column index.
 
@@ -73,7 +73,8 @@ The library should implement the following layers as namespaces:
 
 # All layers
 - Namespace docstrings should match the description of each layer in the instruction files.
-- Don't hard-code the defaults for read-key-fn or write-key-fn anywhere in the code, either in part or in full. As in, no hard-coding of keyword, keyword?, name, str/upper-case, str/lower-case etc. Regarding tests, hard-coding is acceptable for unit tests, but not for integration tests.
+- The README must be updated whenever the code changes, especially where it would affect the usage examples.
+- Don't hard-code the defaults for col->key-fn or key->col-fn anywhere in the code, either in part or in full. As in, no hard-coding of keyword, keyword?, name, str/upper-case, str/lower-case etc. Regarding tests, hard-coding is acceptable for unit tests, but not for integration tests.
 - The names of any vars that are passed as args to functions should match the name of the args, if possible.
 - Don't create any namespaces with the same name.
 - Don't create any code that leaves unused vars.
