@@ -23,7 +23,7 @@ As a proof-of-concept, it covers the essential parts of the underlying API witho
 3. **Session macros** - Use `with-open` macro support for automatic session cleanup
 4. **Convert Malli schemas to Snowpark schemas** - Generate Snowpark schemas from Malli specifications with property-based testing
 5. **Map-like access to columns** - Access dataframe columns using Clojure map semantics (`(df :column)` or `(:column df)`)
-6. **Convert to a tech.ml.dataset or Tablecloth dataset** - Transform Snowpark results to Scicloj ecosystem datasets for further analysis
+6. **Convert to a tech.ml.dataset or Tablecloth dataset** - Transform Snowpark results to the [Scicloj](https://scicloj.github.io) ecosystem for further analysis
 
 ### Planned Features
 
@@ -69,7 +69,7 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
 
 ## Usage
 
-### Feature 1: Load Clojure data and save to Snowflake
+### Feature 1: Save data to a Snowflake table
 
 ```clojure
 (require '[snowpark-clj.core :as sp])
@@ -87,7 +87,7 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
       (sp/save-as-table "employees" :overwrite)))
 ```
 
-### Feature 2: Read from Snowflake and process locally
+### Feature 2: Compute over a table on-cluster and extract a smaller result for local processing
 
 ```clojure
 (with-open [session (sp/create-session "snowflake.edn")]
