@@ -24,7 +24,7 @@
    close-session]
  
   [snowpark-clj.schema
-   malli-schema->snowpark-schema]
+   malli->schema]
 
   [snowpark-clj.dataframe
    create-dataframe

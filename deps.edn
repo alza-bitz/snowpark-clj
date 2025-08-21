@@ -6,7 +6,7 @@
         metosin/malli {:mvn/version "0.19.1"}
         potemkin/potemkin {:mvn/version "0.4.6"}}
  :aliases
- {:dev {:extra-paths ["dev" "test" "integration"]
+ {:dev {:extra-paths ["dev" "test" "integration" "uat"]
         :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
                      org.clojure/tools.namespace {:mvn/version "1.5.0"}
                      tortue/spy {:mvn/version "2.15.0"}}

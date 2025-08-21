@@ -102,7 +102,7 @@
   (testing "Feature 4: Malli schema to Snowpark schema conversion"
     ;; Convert Malli schema to Snowpark schema
     (let [data (mg/generate [:vector {:gen/min 5 :gen/max 5} schemas/employee-schema-with-optional-keys])
-          schema (sp/malli-schema->snowpark-schema *session* schemas/employee-schema-with-optional-keys)
+          schema (sp/malli->schema *session* schemas/employee-schema-with-optional-keys)
           dataframe (sp/create-dataframe *session* data schema)]
 
       (is (= 5 (sp/row-count dataframe)))
@@ -218,7 +218,7 @@
     ;; Generate test data using Malli schemas
     (let [data (mg/generate [:vector {:gen/min 10 :gen/max 10} schemas/employee-schema-with-optional-keys])
           ;; Create dataframe and collect data
-          schema (sp/malli-schema->snowpark-schema *session* schemas/employee-schema-with-optional-keys)
+          schema (sp/malli->schema *session* schemas/employee-schema-with-optional-keys)
           dataframe (sp/create-dataframe *session* data schema)
           collected-data (sp/collect dataframe)
           ;; Convert to Tablecloth dataset

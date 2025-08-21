@@ -46,7 +46,7 @@
   (testing "Create dataframe from a collection of maps with explicit schema"
     (let [data (mg/generate [:vector {:gen/min 2 :gen/max 5} schemas/employee-schema-with-optional-keys])
           ;; Create a schema using the schema namespace
-          session-schema (schema/malli-schema->snowpark-schema *session* schemas/employee-schema-with-optional-keys)
+          session-schema (schema/malli->schema *session* schemas/employee-schema-with-optional-keys)
           result (df/create-dataframe *session* data session-schema)]
 
       ;; Verify the result is properly wrapped

@@ -78,7 +78,7 @@
     ;; Default fallback
     :else (throw (IllegalArgumentException. (str "Unsupported schema: " malli-type)))))
 
-(defn malli-schema->snowpark-schema
+(defn malli->schema
   "Create a Snowpark schema from a Malli schema.
    
    Supports map schemas like:

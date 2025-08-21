@@ -6,7 +6,7 @@ A Clojure wrapper for Snowpark, enabling idiomatic Clojure interaction with Snow
 
 Although the Snowpark library has Java and Scala bindings, it doesn't provide anything for Clojure. As such, it's currently not possible to interact with Snowflake using the Clojure way. This library provides a proof-of-concept wrapper to enable all kinds of Snowflake use cases directly from the Clojure REPL.
 
-The purpose is to demonstrate the validity of the approach as a foundation for enabling a wide range of data science or engineering use cases from the Clojure REPL, in situations where Snowflake is the data warehouse of choice. To aid those who are familiar with Snowflake and the Snowpark API, the same concepts are presented with the same names (session, dataframe, etc). To aid those who are familiar with Clojure, the external API is idiomatic Clojure.
+The purpose is to demonstrate the validity of the approach as a foundation for enabling a wide range of data science or engineering use cases from the Clojure REPL, in situations where Snowflake is the data warehouse of choice. To aid those who are familiar with Snowflake and the Snowpark API, the same concepts are presented with the same names (session, dataframe, etc). To aid those who are familiar with Clojure, the external API tries to be idiomatic Clojure.
 
 ## Features
 
@@ -145,7 +145,7 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
 (def test-data (mg/sample employee-schema-with-optional-keys 100))
 
 (with-open [session (sp/create-session "snowflake.edn")]
-  (let [snowpark-schema (sp/malli-schema->snowpark-schema session employee-schema-with-optional-keys)]
+  (let [snowpark-schema (sp/malli->schema session employee-schema-with-optional-keys)]
     (-> test-data
         (sp/create-dataframe session snowpark-schema)  ; Explicit schema conversion
         (sp/save-as-table "test_employees_with_optional_age" :overwrite))))
