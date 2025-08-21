@@ -2,6 +2,8 @@
 
 A Clojure wrapper for Snowpark, enabling idiomatic Clojure interaction with Snowflake from the REPL.
 
+[![CI/CD Status](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml/badge.svg)](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml)
+
 ## Description & Rationale
 
 Although the Snowpark library has Java and Scala bindings, it doesn't provide anything for Clojure. As such, it's currently not possible to interact with Snowflake using the Clojure way. This library provides a proof-of-concept wrapper to enable all kinds of Snowflake use cases directly from the Clojure REPL.
@@ -26,10 +28,6 @@ The purpose is to demonstrate the validity of the approach as a foundation for e
 - UDFs and stored procedures
 - Async operations
 - Load from/save to Snowflake stages
-
-## CI/CD Status
-
-[![Build](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml/badge.svg)](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml)
 
 ## Prerequisites
 
@@ -145,9 +143,9 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
 (def test-data (mg/sample employee-schema-with-optional-keys 100))
 
 (with-open [session (sp/create-session "snowflake.edn")]
-  (let [snowpark-schema (sp/malli->schema session employee-schema-with-optional-keys)]
+  (let [schema (sp/malli->schema session employee-schema-with-optional-keys)]
     (-> test-data
-        (sp/create-dataframe session snowpark-schema)  ; Explicit schema conversion
+        (sp/create-dataframe session schema)  ; Explicit schema conversion
         (sp/save-as-table "test_employees_with_optional_age" :overwrite))))
 ```
 
