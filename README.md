@@ -1,6 +1,6 @@
 # snowpark-clj
 
-A Clojure API for [Snowpark](https://docs.snowflake.com/en/developer-guide/snowpark/java/index), enabling idiomatic Clojure interaction with [Snowflake](https://www.snowflake.com).
+A Clojure API for [Snowpark](https://docs.snowflake.com/en/developer-guide/snowpark/java/index) and [Snowflake](https://www.snowflake.com).
 
 [![CI/CD Status](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml/badge.svg)](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml)
 
