@@ -1,6 +1,6 @@
 # snowpark-clj
 
-A Clojure wrapper for Snowpark, enabling idiomatic Clojure interaction with Snowflake from the REPL.
+A Clojure API for [Snowpark](https://docs.snowflake.com/en/developer-guide/snowpark/java/index), enabling idiomatic Clojure interaction with [Snowflake](https://www.snowflake.com).
 
 [![CI/CD Status](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml/badge.svg)](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml)
 
@@ -8,7 +8,7 @@ A Clojure wrapper for Snowpark, enabling idiomatic Clojure interaction with Snow
 
 Although the Snowpark library has Java and Scala bindings, it doesn't provide anything for Clojure. As such, it's currently not possible to interact with Snowflake using the Clojure way. This library provides a proof-of-concept wrapper to enable all kinds of Snowflake use cases directly from the Clojure REPL.
 
-The purpose is to demonstrate the validity of the approach as a foundation for enabling a wide range of data science or engineering use cases from the Clojure REPL, in situations where Snowflake is the data warehouse of choice. To aid those who are familiar with Snowflake and the Snowpark API, the same concepts are presented with the same names (session, dataframe, etc). To aid those who are familiar with Clojure, the external API tries to be idiomatic Clojure.
+The aim is to validate this approach as a foundation for enabling a wide range of data science or data engineering use cases from the Clojure REPL, in situations where Snowflake is the data warehouse of choice. To aid those who are familiar with Snowflake and the Snowpark API, the same concepts are presented with the same names (session, dataframe, etc). To aid those who are familiar with Clojure, the external API tries to present as idiomatic Clojure.
 
 ## Features
 
@@ -232,7 +232,7 @@ This library is built on top of the [Snowpark Java API](https://docs.snowflake.c
 
 Inspired by:
 - [Geni](https://github.com/zero-one-group/geni) - Clojure wrapper for Spark DataFrames
-- [Tablecloth](https://github.com/scicloj/tablecloth) - Dataset manipulation library
+- [Tablecloth](https://github.com/scicloj/tablecloth) - In-memory dataset manipulation
 
 ## License
 
