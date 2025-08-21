@@ -4,13 +4,19 @@ A Clojure API for [Snowpark](https://docs.snowflake.com/en/developer-guide/snowp
 
 [![CI/CD Status](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml/badge.svg)](https://github.com/alza-bitz/snowpark-clj/actions/workflows/build.yml)
 
-## Description & Rationale
+## Summary
 
 Although the Snowpark library has Java and Scala bindings, it doesn't provide anything for Clojure. As such, it's currently not possible to interact with Snowflake using the Clojure way. This library provides a proof-of-concept wrapper to enable all kinds of Snowflake use cases directly from the Clojure REPL.
 
-The aim is to validate this approach as a foundation for enabling a wide range of data science or data engineering use cases from the Clojure REPL, in situations where Snowflake is the data warehouse of choice. To aid those who are familiar with Snowflake and the Snowpark API, the same concepts are presented with the same names (session, dataframe, etc). To aid those who are familiar with Clojure, the external API tries to present as idiomatic Clojure.
+## Aims
+
+To aid those who are familiar with Snowflake and the Snowpark API, the same concepts are presented with the same names (session, dataframe, etc). To aid those who are familiar with Clojure, the external API tries to present as idiomatic Clojure.
+
+The aim is to validate this approach as a foundation for enabling a wide range of data science or data engineering use cases from the Clojure REPL, in situations where Snowflake is the data warehouse of choice.
 
 ## Features
+
+As a proof-of-concept, it covers the essential parts of the underlying API without being too concerned with performance or completeness. More specifically, it currently only supports reading and writing data from local memory rather than from Snowflake stages or streaming, and it only supports password authentication. These and other more advanced features are noted and [planned](#planned-features), pending further elaboration.
 
 1. **Load Clojure data from local and save to a Snowflake table** - Create Snowpark sessions and dataframes from Clojure data structures, then save to Snowflake tables
 2. **Compute over Snowflake table(s) on-cluster and extract results locally** - Read from Snowflake tables, perform computations on-cluster, and collect results back to Clojure

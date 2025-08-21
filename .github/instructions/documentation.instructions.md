@@ -5,7 +5,8 @@ applyTo: '**'
 README.md
 - It should include:
   - CI/CD badges: unit tests, integration tests, uat tests
-  - Description & rationale
+  - Summary
+  - Rationale
   - List of features
   - Pre-requisites: installed tools, Snowflake account, snowflake.edn, SNOWFLAKE_PASSWORD, etc.
   - Usage: concise code examples demonstrating each of the numbered features
