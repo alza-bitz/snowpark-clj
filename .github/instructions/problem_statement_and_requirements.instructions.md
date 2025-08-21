@@ -60,7 +60,7 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 (df :name) or (:name df)
 ```
 
-## Feature 6 - Convert to tech.ml.dataset or Tablecloth dataset
+## Feature 6 - Convert to a tech.ml.dataset or Tablecloth dataset
 
 ### Requirements
 - As per feature 2 except at step 4, transform the result from Snowpark rows, including the schema, to a tech.ml.dataset or Tablecloth dataset for further processing with Tableplot or other Scicloj libraries.
