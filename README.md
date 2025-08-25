@@ -8,6 +8,8 @@ A Clojure API for [Snowpark](https://docs.snowflake.com/en/developer-guide/snowp
 
 Although the Snowpark library has Java and Scala bindings, it doesn't provide anything for Clojure. As such, it's currently not possible to interact with Snowflake using the Clojure way. This library provides a proof-of-concept wrapper to enable all kinds of Snowflake use cases directly from the Clojure REPL.
 
+It should be noted that since Snowpark is based on the Snowflake JDBC driver, this wrapper inherits that model and as such it is fundamentally a row-oriented API.
+
 ## Aims
 
 To aid those who are familiar with Snowflake and the Snowpark API, the same concepts are presented with the same names (session, dataframe, etc). To aid those who are familiar with Clojure, the external API tries to present as idiomatic Clojure.
