@@ -16,6 +16,8 @@ Although the Snowpark library has Java and Scala bindings, it doesn't provide an
 1. To aid those who are familiar with Clojure, the external API should be idiomatic Clojure.
 
 ## Snowpark considerations
+- Snowpark itself is a thin wrapper over the Snowflake SQL engine, pushing computation to the cluster rather than pulling data locally for processing.
+- Since it is based on the Snowflake JDBC driver, it is fundamentally a row-oriented API.
 - Snowpark sessions are mutable and not thread-safe.
 - Snowpark dataframes are immutable.
 - Snowpark dataframe operations are either transformations (lazy) or actions (eager).
@@ -68,7 +70,8 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 ## Features that are planned but have not yet been elaborated
 - Support for adding column(s) to a dataset
 - Support for joins
-- Streaming read: wrap DataFrame.toLocalIterator() as a reducible coll for processing with transducers
+- Performance tests incl. profiling and benchmarking
+- Streaming read: wrap DataFrame.toLocalIterator() as a reducible coll for processing with transducers (example: more efficient conversion to a tech.ml.dataset or Tablecloth dataset)
 - Streaming write?
 - Load data from stage using DataFrameReader
 - Save data to stage using DataFrameWriter
@@ -78,4 +81,5 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 - UDFs
 - Stored procedures
 - Async
+- Column-oriented (instead of row-oriented) API, using the Snowflake ADBC driver and Apache Arrow
 - Load a tech.ml.dataset or Tablecloth dataset from local and save to a Snowflake table
