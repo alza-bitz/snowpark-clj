@@ -6,8 +6,11 @@ on:
     paths: 
       - 'src/**'
       - 'test/**'
+      - 'integration/**'
+      - 'uat/**'
       - 'deps.edn'
       - '.github/**'
+      - '!.github/instructions/**'
   pull_request:
     types: [opened, synchronize, reopened]
 

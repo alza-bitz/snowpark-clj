@@ -51,7 +51,7 @@ Alternatively, use an editor or environment that supports dev containers. The su
 
 ### Snowflake Configuration
 
-Create a `snowflake.edn` file in your project root:
+Create a `snowflake.edn` file:
 
 ```clojure
 {:url "https://your-account.snowflakecomputing.com"
@@ -84,8 +84,7 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
 
 ;; Create session and save data
 (with-open [session (sp/create-session "snowflake.edn")]
-  (-> employee-data
-      (sp/create-dataframe session)
+  (-> (sp/create-dataframe session employee-data)
       (sp/save-as-table "employees" :overwrite)))
 ```
 
@@ -107,54 +106,31 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
 ;; Session automatically closed after block execution
 (with-open [session (sp/create-session "snowflake.edn")]
   (let [df (sp/table session "employees")]
-    (sp/count df)))
+    (sp/row-count df)))
 ```
 
-### Feature 4: Using Malli schemas
-
-#### Example 1: Schema inference from data
+### Feature 4: Convert Malli schemas to Snowpark schemas
 
 ```clojure
 (require '[malli.core :as m]
          '[malli.generator :as mg])
 
-(def employee-schema
-  [:map
-   [:id [:int {:min 1}]]
-   [:name :string]
-   [:age [:int {:min 18 :max 65}]]
-   [:department [:enum "Engineering" "Marketing" "Sales"]]
-   [:salary [:int {:min 30000 :max 200000}]]])
-
-;; Generate test data from schema - schema inferred from first row
-(def test-data (mg/sample employee-schema 100))
-
-(with-open [session (sp/create-session "snowflake.edn")]
-  (-> test-data
-      (sp/create-dataframe session)  ; Schema inferred automatically
-      (sp/save-as-table "test_employees" :overwrite)))
-```
-
-#### Example 2: Create Snowpark schema from Malli schema
-
-```clojure
 ;; Schema with optional age field
 (def employee-schema-with-optional-keys
-  [:map
-   [:id :int]
-   [:name :string] 
-   [:department [:enum "Engineering" "Marketing" "Sales"]]
-   [:salary [:int {:min 50000 :max 100000}]]
-   [:age {:optional true} :int]])
+  (m/schema [:map
+             [:id :int]
+             [:name :string] 
+             [:department [:enum "Engineering" "Marketing" "Sales"]]
+             [:salary [:int {:min 50000 :max 100000}]]
+             [:age {:optional true} :int]]))
 
 ;; Generate test data from schema
-(def test-data (mg/sample employee-schema-with-optional-keys 100))
+(def test-data (mg/sample employee-schema-with-optional-keys {:size 10}))
 
 (with-open [session (sp/create-session "snowflake.edn")]
   (let [schema (sp/malli->schema session employee-schema-with-optional-keys)]
-    (-> test-data
-        (sp/create-dataframe session schema)  ; Explicit schema conversion
-        (sp/save-as-table "test_employees_with_optional_age" :overwrite))))
+    (-> (sp/create-dataframe session test-data schema)  ; Explicit schema conversion
+        (sp/save-as-table "employees_generated" :overwrite))))
 ```
 
 ### Feature 5: Map-like column access

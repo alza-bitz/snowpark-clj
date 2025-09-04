@@ -72,6 +72,7 @@ The library should implement the following layers as namespaces:
 - Geni, a Clojure wrapper for Spark Dataframes: https://github.com/zero-one-group/geni
 
 # All layers
+- Any existing code examples in the project documentation **must** be tested at the REPL whenever you make changes to the code!
 - Namespace docstrings should match the description of each layer in the instruction files.
 - The README must be updated whenever the code changes, especially where it would affect the usage examples.
 - Don't hard-code the defaults for col->key-fn or key->col-fn anywhere in the code, either in part or in full. As in, no hard-coding of keyword, keyword?, name, str/upper-case, str/lower-case etc. Regarding tests, hard-coding is acceptable for unit tests, but not for integration tests.
