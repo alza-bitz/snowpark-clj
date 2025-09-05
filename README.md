@@ -18,24 +18,16 @@ Validate the approach as a foundation for enabling a wide range of data science 
 
 ## Features
 
-As a proof-of-concept, this library covers the essential parts of the underlying API without being too concerned about performance or completeness. More specifically, it currently only supports reading and writing data from local memory rather than Snowflake stages or streaming, and it only supports password authentication. These and other more advanced features are noted and [planned](#planned-features) pending further elaboration.
+All currently implemented features are summarised here. The [problem statement and requirements instructions](.github/instructions/problem_statement_and_requirements.instructions.md) give more details for each feature.
 
-1. **Load Clojure data from local and save to a Snowflake table** - Create Snowpark sessions and dataframes from Clojure data structures, then save to Snowflake tables
-2. **Compute over Snowflake table(s) on-cluster and extract results locally** - Read from Snowflake tables, perform computations on-cluster, and collect results back to Clojure
+1. **Load data from local and save to a Snowflake table** - Create Snowpark sessions and dataframes from Clojure data structures, then save to Snowflake tables
+2. **Compute over Snowflake table(s) on-cluster to produce a smaller result for local processing** - Read from Snowflake tables, perform computations on-cluster, and collect results back to Clojure
 3. **Session macros** - Use `with-open` macro support for automatic session cleanup
-4. **Convert Malli schemas to Snowpark schemas** - Generate Snowpark schemas from Malli specifications with property-based testing
+4. **Create Snowpark schemas from Malli schemas** - As per feature 1 except the Snowpark schema is created from a Malli schema instead of being inferred from the data
 5. **Map-like access to columns** - Access dataframe columns using Clojure map semantics (`(df :column)` or `(:column df)`)
-6. **Convert to a tech.ml.dataset or Tablecloth dataset** - Transform Snowpark results to the [Scicloj](https://scicloj.github.io) ecosystem for further analysis
+6. **Transform to a tech.ml.dataset or Tablecloth dataset** - As per feature 2, but transforming Snowpark results to the [Scicloj](https://scicloj.github.io) ecosystem for further analysis
 
-### Planned Features
-
-- Support for adding column(s) to a dataset
-- Support for joins
-- Streaming read and write operations
-- Authentication beyond username/password
-- UDFs and stored procedures
-- Async operations
-- Load from/save to Snowflake stages
+As a proof-of-concept, this library covers the essential parts of the underlying API without being too concerned about performance or completeness. More specifically, it currently only supports reading and writing data from local memory rather than Snowflake stages or streaming, and it only supports password authentication. However, these and other more advanced features are [noted and planned](.github/instructions/problem_statement_and_requirements.instructions.md#features-that-are-planned-but-have-not-yet-been-elaborated) pending further elaboration.
 
 ## Prerequisites
 
@@ -43,7 +35,7 @@ As a proof-of-concept, this library covers the essential parts of the underlying
 - Clojure 1.12.0 or later
 - If you want to run the GitHub Actions workflow locally: Github CLI and Docker
 
-Alternatively, use an editor or environment that supports dev containers. The supplied [devcontainer.json](https://github.com/alza-bitz/nrepl-ws-server/blob/main/.devcontainer/devcontainer.json) will install all the above prerequisites.
+Alternatively, use an editor or environment that supports [dev containers](https://containers.dev). The supplied [devcontainer.json](https://github.com/alza-bitz/nrepl-ws-server/blob/main/.devcontainer/devcontainer.json) will install all the above prerequisites.
 
 - A Snowflake account, db and schema, plus a user and role with the required permissions e.g. create tables, read/write data etc.
 - A `snowflake.edn` configuration file
@@ -163,6 +155,9 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
 ```
 
 ## Development
+
+### Approach
+The [development approach instructions](.github/instructions/approach.instructions.md) provide details on the development approach and methodology used.
 
 ### Running Tests
 

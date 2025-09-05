@@ -25,53 +25,43 @@ Although the Snowpark library has Java and Scala bindings, it doesn't provide an
 - The com.snowflake.snowpark_java package contains the main classes for the Snowpark API.
 - The com.snowflake.snowpark_java.types package contains classes for defining schemas.
 
-## Feature 1 - Load Clojure data from local and save to a Snowflake table
+## Features
 
-### Requirements
+### Feature 1 - Load data from local and save to a Snowflake table
 1. Create a Snowpark session
 2. Create a Snowpark dataframe from a vector of maps converted to rows and a schema inferred from the first row, before wrapping Session.createDataFrame(..)
 3. Write the Snowpark dataframe to a Snowflake table, wrapping DataFrameWriter.saveAsTable(..)
 4. Close the session.
 
-## Feature 2 - Compute over Snowflake table(s) on-cluster and extract a smaller result for further processing locally
-
-### Requirements
+### Feature 2 - Compute over Snowflake table(s) on-cluster to produce a smaller result for local processing
 1. Create a Snowpark session
 2. Read by wrapping Session.table(..) and then compute over Snowflake table(s) on-cluster
 3. Copy the result from cluster to local, wrapping DataFrame.collect()
 4. Transform the result from Snowpark rows to a vector of maps
 5. Close the session.
 
-## Feature 3 - Session macros
-
-### Requirements
+### Feature 3 - Session macros
 - Make the session wrapper implement java.io.Closeable so that the with-open macro can be used with the result of create-session and ensure the session is closed after the body has been evaluated.
 
-## Feature 4 - Convert Malli schemas to Snowpark schemas
-
-### Requirements
-- As per feature 1 except at step 2, the data is generated from a Malli schema and the Snowpark schema is created from the Malli schema.
+### Feature 4 - Convert Malli schemas to Snowpark schemas
+- As per feature 1 except at step 2, the Snowpark schema is created from the Malli schema instead of being inferred from the data. Further, since we have a Malli schema, the data to be loaded can be generated from the same Malli schema.
 - Add some generative, property-based round-trip unit tests that define a Malli schema, generate data and create a schema, then convert maps to rows, convert rows back to maps again and assert the result is equal to the generated data.
 - Add some generative, property-based round-trip integration tests that define a Malli schema, generate data and create a schema, then create a dataset, collect and assert the result is equal to the generated data.
 
-## Feature 5 - Map-like access to columns
-
-### Requirements
+### Feature 5 - Map-like access to columns
 The wrapped dataset should present like a Clojure map. As in, the columns of the wrapped dataset must be accessible in the same way that keys can be used to access the values of a Clojure map. I'm looking to emulate what Tablecloth does here.
 ```clojure
 (df :name) or (:name df)
 ```
 
-## Feature 6 - Convert to a tech.ml.dataset or Tablecloth dataset
-
-### Requirements
+### Feature 6 - Transform to a tech.ml.dataset or Tablecloth dataset
 - As per feature 2 except at step 4, transform the result from Snowpark rows, including the schema, to a tech.ml.dataset or Tablecloth dataset for further processing with Tableplot or other Scicloj libraries.
 
-## Features that are planned but have not yet been elaborated
+### Features that are planned but have not yet been elaborated
 - Support for adding column(s) to a dataset
 - Support for joins
 - Performance tests incl. profiling and benchmarking
-- Streaming read: wrap DataFrame.toLocalIterator() as a reducible coll for processing with transducers (example: more efficient conversion to a tech.ml.dataset or Tablecloth dataset)
+- Streaming read: wrap DataFrame.toLocalIterator() as a reducible coll for processing with transducers (for example, more efficient transformation to a tech.ml.dataset or Tablecloth dataset)
 - Streaming write?
 - Load data from stage using DataFrameReader
 - Save data to stage using DataFrameWriter
@@ -82,4 +72,3 @@ The wrapped dataset should present like a Clojure map. As in, the columns of the
 - Stored procedures
 - Async
 - Column-oriented (instead of row-oriented) API, using the Snowflake ADBC driver and Apache Arrow
-- Load a tech.ml.dataset or Tablecloth dataset from local and save to a Snowflake table

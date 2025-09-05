@@ -10,7 +10,7 @@ The library should implement the following layers as namespaces:
 - It should re-export functions from the other layers using import-vars from potemkin to preserve the arguments and docstrings.
 - When function names in other layers have been prefixed or suffixed to avoid collisions with Clojure core, those prefixed functions should not be re-exported directly. Instead those functions should be re-exported without the prefix or suffix, whilst still preserving the arguments and docstrings
 - It should use `(:refer-clojure :exclude [<functions whose names collide with clojure core>])` to avoid name collision warnings with clojure.core
-- It should allow for thread last over Snowpark dataframes (as we would with lazy sequences) to build Snowpark transformations.
+- It should allow for thread first over Snowpark dataframes (as we would with Tablecloth datasets) to build transformations.
 
 # Session layer
 - The internal API for Snowpark session functions.
