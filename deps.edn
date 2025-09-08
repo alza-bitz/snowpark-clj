@@ -4,7 +4,7 @@
         com.github.igrishaev/mask {:mvn/version "0.1.1"}
         com.snowflake/snowpark {:mvn/version "1.14.0"}
         metosin/malli {:mvn/version "0.19.1"}
-        potemkin/potemkin {:mvn/version "0.4.6"}}
+        potemkin/potemkin {:mvn/version "0.4.8"}}
  :aliases
  {:dev {:extra-paths ["dev" "test" "integration" "uat"]
         :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
