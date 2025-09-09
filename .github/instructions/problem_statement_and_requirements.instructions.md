@@ -43,7 +43,7 @@ Although the Snowpark library has Java and Scala bindings, it doesn't provide an
 ### Feature 3 - Session macros
 - Make the session wrapper implement java.io.Closeable so that the with-open macro can be used with the result of create-session and ensure the session is closed after the body has been evaluated.
 
-### Feature 4 - Convert Malli schemas to Snowpark schemas
+### Feature 4 - Create Snowpark schemas from Malli schemas
 - As per feature 1 except at step 2, the Snowpark schema is created from the Malli schema instead of being inferred from the data. Further, since we have a Malli schema, the data to be loaded can be generated from the same Malli schema.
 - Add some generative, property-based round-trip unit tests that define a Malli schema, generate data and create a schema, then convert maps to rows, convert rows back to maps again and assert the result is equal to the generated data.
 - Add some generative, property-based round-trip integration tests that define a Malli schema, generate data and create a schema, then create a dataset, collect and assert the result is equal to the generated data.

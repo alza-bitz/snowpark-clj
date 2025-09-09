@@ -101,7 +101,7 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
     (sp/row-count df)))
 ```
 
-### Feature 4: Convert Malli schemas to Snowpark schemas
+### Feature 4: Create Snowpark schemas from Malli schemas
 
 ```clojure
 (require '[malli.core :as m]
@@ -183,6 +183,7 @@ clojure -M:test && clojure -M:integration && clojure -M:uat
 Add `SNOWFLAKE_PASSWORD=your-actual-password` to `./actsecrets`
 
 ```bash
+gh auth login
 gh extension install https://github.com/nektos/gh-act
 gh act
 ```
