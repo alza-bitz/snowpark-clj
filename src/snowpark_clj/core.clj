@@ -1,83 +1,62 @@
 (ns snowpark-clj.core
   "The external API used by clients."
   (:require [potemkin :refer [import-vars]]
-            [snowpark-clj.column :as col]
-            [snowpark-clj.dataframe :as df]
-            [snowpark-clj.functions :as fn]
+            [snowpark-clj.column]
+            [snowpark-clj.dataframe]
+            [snowpark-clj.functions]
             [snowpark-clj.schema]
             [snowpark-clj.session])
   (:refer-clojure :exclude [filter sort group-by take
                             and not or abs count max min]))
 
-;; Re-export functions from other layers with preserved docstrings and arglists
+;; Firstly we re-export the functions from other layers that don't conflict with clojure core
+;; with preserved docstrings and arglists
+
 (import-vars
-  [snowpark-clj.column 
-   gt
-   lt
-   eq
-   geq
-   leq
-   neq]
+ [snowpark-clj.column
+  gt lt eq geq leq neq]
 
-  [snowpark-clj.session
-   create-session
-   close-session]
- 
-  [snowpark-clj.schema
-   malli->schema]
+ [snowpark-clj.session
+  create-session
+  close-session]
 
-  [snowpark-clj.dataframe
-   create-dataframe
-   table
-   sql
-   select
-   where
-   limit
-   agg
-   join
-   collect
-   row-count
-   show 
-   save-as-table
-   col
-   schema]
-  
-  [snowpark-clj.functions 
-   lit
-   avg
-   sum
-   upper
-   lower])
+ [snowpark-clj.schema
+  malli->schema]
 
-;; Create clean aliases for prefixed functions that conflict with clojure.core
-;; These preserve the original metadata (docstrings, arglists) from the prefixed versions
-(def ^{:arglists (:arglists (meta #'df/df-filter))
-       :doc (:doc (meta #'df/df-filter))}
-  filter df/df-filter)
+ [snowpark-clj.dataframe
+  create-dataframe table sql select where limit agg join
+  collect row-count show save-as-table col schema]
 
-(def ^{:arglists (:arglists (meta #'df/df-sort))
-       :doc (:doc (meta #'df/df-sort))}
-  sort df/df-sort)
+ [snowpark-clj.functions
+  lit avg sum upper lower])
 
-(def ^{:arglists (:arglists (meta #'df/df-group-by))
-       :doc (:doc (meta #'df/df-group-by))}
-  group-by df/df-group-by)
+;; Secondly we re-export the functions that do have conflicts with clojure core
 
-(def ^{:arglists (:arglists (meta #'df/df-take))
-       :doc (:doc (meta #'df/df-take))}
-  take df/df-take)
+;; Simple declare statements to help clj-kondo recognize the symbols
+;; The actual implementations will be provided by potemkin import-vars
+;; Note: some clj-kondo errors still won't report correctly for these specific functions
+;; e.g. invalid-arity won't be reported in cases when it should be. This is a known issue
+(declare filter sort group-by take and not or abs count max min)
 
-;; Same as above but done declaratively / data-driven style
-(let [alias-mappings [['col/and-fn 'and]
-                      ['col/not-fn 'not]
-                      ['col/or-fn 'or]
-                      ['fn/abs-fn 'abs]
-                      ['fn/count-fn 'count]
-                      ['fn/max-fn 'max]
-                      ['fn/min-fn 'min]]]
-  (doseq [[source-fn target-name] alias-mappings]
-    (let [source-var (resolve source-fn)]
-      (when source-var
-        (let [new-var (intern *ns* target-name @source-var)]
-          (alter-meta! new-var merge
-                       (select-keys (meta source-var) [:arglists :doc])))))))
+;; clj-kondo doesn't understand potemkin's :rename syntax, so we suppress the redefined var warnings
+#_{:clj-kondo/ignore [:redefined-var]}
+(import-vars
+ [snowpark-clj.column
+  :refer [and-fn not-fn or-fn]
+  :rename {and-fn and
+           not-fn not
+           or-fn or}]
+
+ [snowpark-clj.dataframe
+  :refer [df-filter df-sort df-group-by df-take]
+  :rename {df-filter filter
+           df-sort sort
+           df-group-by group-by
+           df-take take}]
+
+ [snowpark-clj.functions
+  :refer [abs-fn count-fn max-fn min-fn]
+  :rename {abs-fn abs
+           count-fn count
+           max-fn max
+           min-fn min}])
