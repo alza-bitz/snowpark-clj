@@ -33,18 +33,20 @@ As a proof-of-concept, this library covers the essential parts of the underlying
 
 - Java 11 or 17
 - Clojure 1.12.0 or later
-- If you want to run the GitHub Actions workflow locally: Github CLI and Docker
 
-Alternatively, use an editor or environment that supports [dev containers](https://containers.dev). The supplied [devcontainer.json](https://github.com/alza-bitz/nrepl-ws-server/blob/main/.devcontainer/devcontainer.json) will install all the above prerequisites.
+Alternatively, use an editor or environment that supports [dev containers](https://containers.dev). The [basecloj](https://github.com/scicloj/devcontainer-templates/tree/main/src/basecloj) dev container template will install all the above prerequisites.
 
 - A Snowflake account, db and schema, plus a user and role with the required permissions e.g. create tables, read/write data etc.
 - A `snowflake.edn` configuration file
-- A `SNOWFLAKE_PASSWORD` environment variable
 
-### Snowflake Configuration
+## Configuration
+To create a session, a Snowflake configuration is required. This can be provided as an edn file or a Clojure map. Either way, it will be validated against a [config schema](https://github.com/alza-bitz/snowpark-clj/blob/main/src/snowpark_clj/config.clj) on load.
 
-Create a `snowflake.edn` file:
+### Read password from an environment variable
 
+Use an [#env](https://github.com/juxt/aero#env) tagged literal to read the password from an environment variable.
+
+`snowflake.edn`
 ```clojure
 {:url "https://your-account.snowflakecomputing.com"
  :user "your-username"
@@ -58,10 +60,56 @@ Create a `snowflake.edn` file:
 Export your password:
 
 ```bash
-export SNOWFLAKE_PASSWORD="your-actual-password"
+$ export SNOWFLAKE_PASSWORD="your-actual-password"
 ```
 
+### Read password from an include file
+Use an [#include](https://github.com/juxt/aero#include) tagged literal to read the password from a separate file.
+
+`snowflake.edn`
+```clojure
+{:url "https://your-account.snowflakecomputing.com"
+ :user "your-username"
+ :password #mask #include "password.edn"
+ :role "your-role"
+ :warehouse "your-warehouse"
+ :db "your-database"
+ :schema "your-schema"}
+```
+
+`password.edn`
+```clojure
+"your-actual-password"
+```
+Note: `password.edn` needs to be in the same directory as `snowflake.edn`. If the config file is in your project, make sure to add the password file to your `.gitignore` file!
+
 ## Usage
+
+Add the `snowpark-clj` dependency:
+
+`deps.edn`
+```clojure
+{:deps {snowpark-clj/snowpark-clj {:git/sha "fd6ea012b464f4d000b31b70ebd9773e3659e019"}}}
+```
+Then start a REPL. This example uses the command-line tool, but you can use your favourite editor-connected REPL instead.
+```bash
+$ clj
+```
+
+If you are using Java 17 or later, you will also need to [provide a JVM option](https://community.snowflake.com/s/article/JDBC-Driver-Compatibility-Issue-With-JDK-16-and-Later) as follows:
+
+`deps.edn`
+```clojure
+{:deps {snowpark-clj/snowpark-clj {:git/sha "fd6ea012b464f4d000b31b70ebd9773e3659e019"}}
+ :aliases
+ {:repl {:jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"]}}}
+```
+
+Then start a REPL with the alias:
+
+```bash
+$ clj -M:repl
+```
 
 ### Feature 1: Save data to a Snowflake table
 
@@ -156,6 +204,12 @@ export SNOWFLAKE_PASSWORD="your-actual-password"
 
 ## Development
 
+### Prerequisites
+
+- Github CLI and Docker (If you want to run the GitHub Actions workflow locally)
+
+Alternatively, use an editor or environment that supports [dev containers](https://containers.dev). The supplied [devcontainer.json](https://github.com/alza-bitz/nrepl-ws-server/blob/main/.devcontainer/devcontainer.json) will install all the above prerequisites.
+
 ### Approach
 The [development approach instructions](.github/instructions/approach.instructions.md) provide details on the development approach and methodology used.
 
@@ -163,19 +217,19 @@ The [development approach instructions](.github/instructions/approach.instructio
 
 ```bash
 # Unit tests
-clojure -M:test
+$ clojure -M:test
 
 # Integration tests (requires Snowflake connection)
 export SNOWFLAKE_PASSWORD="your-actual-password"
-clojure -M:integration
+$ clojure -M:integration
 
 # UAT tests (requires Snowflake connection)
 export SNOWFLAKE_PASSWORD="your-actual-password"
-clojure -M:uat
+$ clojure -M:uat
 
 # All tests
 export SNOWFLAKE_PASSWORD="your-actual-password"
-clojure -M:test && clojure -M:integration && clojure -M:uat
+$ clojure -M:test && clojure -M:integration && clojure -M:uat
 ```
 
 ### Running GitHub Actions Locally
@@ -183,9 +237,9 @@ clojure -M:test && clojure -M:integration && clojure -M:uat
 Add `SNOWFLAKE_PASSWORD=your-actual-password` to `./actsecrets`
 
 ```bash
-gh auth login
-gh extension install https://github.com/nektos/gh-act
-gh act
+$ gh auth login
+$ gh extension install https://github.com/nektos/gh-act
+$ gh act
 ```
 
 ### REPL Development
@@ -193,7 +247,7 @@ gh act
 Start a REPL with development dependencies:
 
 ```bash
-clojure -M:dev
+$ clj -M:dev
 ```
 
 The library uses structured logging with SLF4J. Configure logging levels in `resources/simplelogger.properties`.
