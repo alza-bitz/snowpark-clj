@@ -91,7 +91,9 @@ Add the `snowpark-clj` dependency:
 ```clojure
 {:deps {snowpark-clj/snowpark-clj {:git/sha "fd6ea012b464f4d000b31b70ebd9773e3659e019"}}}
 ```
+
 Then start a REPL. This example uses the command-line tool, but you can use your favourite editor-connected REPL instead.
+
 ```bash
 $ clj
 ```
@@ -211,7 +213,7 @@ $ clj -M:repl
 Alternatively, use an editor or environment that supports [dev containers](https://containers.dev). The supplied [devcontainer.json](https://github.com/alza-bitz/nrepl-ws-server/blob/main/.devcontainer/devcontainer.json) will install all the above prerequisites.
 
 ### Approach
-The [development approach instructions](.github/instructions/approach.instructions.md) provide details on the development approach and methodology used.
+The [development approach instructions](.github/instructions/development_approach.instructions.md) provide details on the development approach and methodology used.
 
 ### Running Tests
 
@@ -252,14 +254,6 @@ $ clj -M:dev
 
 The library uses structured logging with SLF4J. Configure logging levels in `resources/simplelogger.properties`.
 
-### Project Structure
-
-- `src/snowpark_clj/` - Main library code organized by layer (core, session, dataframe, etc.)
-- `test/` - Unit tests
-- `integration/` - Integration tests requiring Snowflake connection
-- `uat/` - User acceptance tests for each feature
-- `dev/` - Development utilities
-
 ## Acknowledgements
 
 This library is built on top of the [Snowpark Java API](https://docs.snowflake.com/en/developer-guide/snowpark/java/index.html).
@@ -272,4 +266,4 @@ Inspired by:
 
 Copyright © 2025 Alex Coyle
 
-Distributed under the Eclipse Public License either version 1.0 or (at your option) any later version.
+Distributed under the [Eclipse Public License](LICENSE) either version 2.0 or (at your option) any later version.

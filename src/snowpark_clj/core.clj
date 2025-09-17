@@ -9,7 +9,7 @@
   (:refer-clojure :exclude [filter sort group-by take
                             and not or abs count max min]))
 
-;; Firstly we re-export the functions from other layers that don't conflict with clojure core
+;; Firstly we re-export the functions from other namespaces that don't conflict with clojure core
 ;; with preserved docstrings and arglists
 
 (import-vars
