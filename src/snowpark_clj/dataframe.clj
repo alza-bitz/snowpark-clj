@@ -43,7 +43,11 @@
 
 ;; Dataframe creation functions
 
-(defn create-dataframe
+(defn
+  ^#:scanner{:class "com.snowflake.snowpark_java.Session"
+             :method "createDataFrame"
+             :params ["com.snowflake.snowpark_java.Row[]" "com.snowflake.snowpark_java.types.StructType"]}
+  create-dataframe
   "Create a dataframe from a collection of maps.
    
    Two-arity version:
@@ -99,7 +103,12 @@
 
 ;; Dataframe transformation functions (lazy)
 
-(defn select
+(defn 
+  ^#:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+             :method "select"
+             :params [["java.lang.String[]"]
+                      ["com.snowflake.snowpark_java.Column[]"]]}
+  select
   "Select columns from a dataframe.
    
    Args:
@@ -114,7 +123,11 @@
         result-df (.select raw-df col-array)]
     (wrapper/wrap-dataframe result-df (wrapper/unwrap-options df))))
 
-(defn df-filter
+(defn
+  ^#:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+             :method "filter"
+             :params ["com.snowflake.snowpark_java.Column"]}
+  df-filter
   "Filter rows in a dataframe using a condition.
    
    Args:
