@@ -104,7 +104,7 @@
     (assoc join-result
            :coverage/method-sig (str method "(" (str/join ", " params) ")")
            :coverage/supported (= :coverage/join-type-inner (:coverage/join-type join-result-item))
-           :coverage/qual-name (str ns "/" name))))
+           :coverage/qual-name (when (and ns name) (str ns "/" name)))))
 
 (defn render
   "Render API coverage as Markdown using the Selmer template."
