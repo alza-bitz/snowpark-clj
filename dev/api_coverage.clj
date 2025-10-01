@@ -1,10 +1,12 @@
 (ns api-coverage
   (:require
-   [clojure.java.io :as io] 
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [selmer.parser :as selmer]
    [net.cgrand.xforms.io :as xio]))
 
 (def scan-result-join-key
-  "Canonical join key for a scan result: [class method params-vector]" 
+  "Canonical join key for a scan result: [class method params-vector]"
   (juxt :scanner/class :scanner/method :scanner/params))
 
 (defn- build-index
@@ -25,11 +27,11 @@
            :left-result left-result
            :right-results (get right-results-index (join-key-fn left-result) [])}))
    (mapcat (fn [join-result] (if (empty? (:right-results join-result))
-                          [(assoc join-result :coverage/join-type :coverage/join-type-left)]
-                          (map #(assoc join-result
-                                       :right-result %
-                                       :coverage/join-type :coverage/join-type-inner)
-                               (:right-results join-result)))))
+                               [(assoc join-result :coverage/join-type :coverage/join-type-left)]
+                               (map #(assoc join-result
+                                            :right-result %
+                                            :coverage/join-type :coverage/join-type-inner)
+                                    (:right-results join-result)))))
    (map #(assoc % :coverage/join-result (merge (:left-result %) (:right-result %))))
    (map #(dissoc % :right-results :left-result :right-result))))
 
@@ -44,7 +46,9 @@
            stats #:coverage{:type :coverage/join-stats
                             :left-count  @left-count
                             :inner-count @inner-count
-                            :right-count (count right-results)}
+                            :right-count (count right-results)
+                            :coverage-pc (if (pos? @left-count)
+                                           (format "%.1f" (* 100.0 (/ @inner-count @left-count))) "0.0")}
            ;; write stats as another value using base-rf's step arity
            base-acc-after-stats (base-rf base-acc stats)]
        (base-rf base-acc-after-stats)))
@@ -91,3 +95,33 @@
 
 (comment
   (generate {}))
+
+(defn- enrich-join-result
+  "Return the nested join result, enriched with additional keys."
+  [join-result-item]
+  (let [join-result (:coverage/join-result join-result-item)
+        {:scanner/keys [method params ns name]} join-result]
+    (assoc join-result
+           :coverage/method-sig (str method "(" (str/join ", " params) ")")
+           :coverage/supported (= :coverage/join-type-inner (:coverage/join-type join-result-item))
+           :coverage/qual-name (str ns "/" name))))
+
+(defn render
+  "Render API coverage as Markdown using the Selmer template."
+  [{:keys [coverage-in out template-in]
+    :or {coverage-in "dev/api-coverage.edn"
+         out "doc/api-coverage.md"
+         template-in "dev/api-coverage.md.tpl"}}]
+  (let [coverage-items (transduce identity conj (xio/edn-in coverage-in))
+        join-stats (some #(when (= :coverage/join-stats (:coverage/type %)) %) coverage-items)
+        join-results (mapv enrich-join-result (filterv #(= :coverage/join-result (:coverage/type %)) coverage-items))
+        ctx {:generated-at (java.time.Instant/now)
+             :stats (or join-stats {})
+             :supported-results (filterv :coverage/supported join-results)
+             :all-results join-results}]
+    (let [template (slurp template-in)]
+      (spit out (selmer/render template ctx)))
+    (println "Rendered Markdown:" out)))
+
+(comment
+  (render {}))
