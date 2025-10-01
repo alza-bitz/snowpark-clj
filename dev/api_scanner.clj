@@ -1,7 +1,7 @@
 (ns api-scanner
   (:require
    [clojure.java.io :as io]
-   [clojure.string :as str] 
+   [clojure.string :as str]
    [net.cgrand.xforms.io :as xio])
   (:import
    [io.github.classgraph ClassGraph]))
@@ -67,16 +67,28 @@
   (let [base (str/replace github-base #"/$" "")]
     (str base "/" file)))
 
+(defn- ns->file-path
+  "Convert to a file path."
+  [ns]
+  (when ns
+    (-> ns
+        str
+        (str/replace "." "/")
+        (str/replace "-" "_")
+        (str ".clj"))))
+
 (defn- ns-publics->scan-result
   "Returns a transducer that converts public namespace mappings to scan results."
-  [github-base]
+  [github-base scan-ns]
   (let [required-keys #{:scanner/class :scanner/method :scanner/params}]
     (comp (map (fn [[_ var]] (meta var)))
-          ;; (filter (fn [metadata] (every? #(contains? metadata %) required-keys)))
-          (map #(merge {:scanner/ns (str (:ns %))
-                        :scanner/name (str (:name %))
-                        :scanner/github (file->github-url github-base (:file %))}
-                       (select-keys % required-keys)))
+          (map (fn [{meta-ns :ns meta-file :file meta-name :name :as metadata}]
+                 (let [result-ns (if (not= meta-ns scan-ns) scan-ns meta-ns)
+                       result-file (if (not= meta-ns scan-ns) (ns->file-path scan-ns) meta-file)]
+                   (merge {:scanner/ns (str result-ns)
+                           :scanner/name (str meta-name)
+                           :scanner/github (file->github-url github-base result-file)}
+                          (select-keys metadata required-keys)))))
           ;; flatten params into a scan result for each if there are nested params
           (mapcat (fn [scan-result]
                     (if (some vector? (:scanner/params scan-result))
@@ -87,7 +99,10 @@
   (require 'snowpark-clj.core :reload-all))
 
 (comment
-  (transduce (ns-publics->scan-result "https://github.com/alza-bitz/snowpark-clj/tree/main/src") conj (ns-publics 'snowpark-clj.core)))
+  (transduce (ns-publics->scan-result "https://github.com/src" 'snowpark-clj.core) conj (ns-publics 'snowpark-clj.core)))
+
+(comment
+  (transduce (ns-publics->scan-result "https://github.com/src" 'snowpark-clj.column) conj (ns-publics 'snowpark-clj.column)))
 
 (defn scan-ns
   "Scan the given Clojure namespace for public vars that have `:scanner/*` metadata
@@ -100,7 +115,7 @@
          (nil? (require namespace :reload-all))]}
   (println "Scanning namespace:" namespace)
   (with-open [writer (io/writer out)]
-    (transduce (ns-publics->scan-result github-base) xio/edn-out writer (ns-publics namespace))
+    (transduce (ns-publics->scan-result github-base namespace) xio/edn-out writer (ns-publics namespace))
     (println "Wrote scan results: " out)))
 
 (comment

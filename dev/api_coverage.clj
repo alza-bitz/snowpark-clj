@@ -121,7 +121,7 @@
              :all-results join-results}]
     (let [template (slurp template-in)]
       (spit out (selmer/render template ctx)))
-    (println "Rendered Markdown:" out)))
+    (println "Wrote markdown:" out)))
 
 (comment
   (render {}))
