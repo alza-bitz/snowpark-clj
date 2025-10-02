@@ -10,6 +10,8 @@ Although the Snowpark library has Java and Scala bindings, it doesn't provide an
 
 To aid those who are already familiar with Snowpark, existing names are retained where possible. Nouns e.g. `session`, `dataframe` are used for namespaces, and verbs e.g. `select`, `filter`, `collect` are used for functions.
 
+The API coverage report is published [here](/doc/api-coverage.md).
+
 Note: Since Snowpark is based on the Snowflake JDBC driver, this wrapper inherits that model and as such it is fundamentally a row-oriented API.
 
 ## Aims
@@ -23,8 +25,8 @@ All currently implemented features are summarised here. The [problem statement a
 1. **Load data from local and save to a Snowflake table** - Create Snowpark sessions and dataframes from Clojure data structures, then save to Snowflake tables
 2. **Compute over Snowflake table(s) on-cluster to produce a smaller result for local processing** - Read from Snowflake tables, perform computations on-cluster, and collect results back to Clojure
 3. **Session macros** - Use `with-open` macro support for automatic session cleanup
-4. **Create Snowpark schemas from Malli schemas** - As per feature 1 except the Snowpark schema is created from a Malli schema instead of being inferred from the data
-5. **Map-like access to columns** - Access dataframe columns using Clojure map semantics (`(df :column)` or `(:column df)`)
+4. **Create Snowpark schemas from Malli schemas** - As per feature 1 except the Snowpark schema is created from a [Malli](https://github.com/metosin/malli) schema instead of being inferred from the data
+5. **Map-like access to columns** - Access dataframe columns using Clojure map semantics, `(df :column)` or `(:column df)`
 6. **Transform to a tech.ml.dataset or Tablecloth dataset** - As per feature 2, but transforming Snowpark results to the [Scicloj](https://scicloj.github.io) ecosystem for further analysis
 
 As a proof-of-concept, this library covers the essential parts of the underlying API without being too concerned about performance or completeness. More specifically, it currently only supports reading and writing data from local memory rather than Snowflake stages or streaming, and it only supports password authentication. However, these and other more advanced features are [noted and planned](.github/instructions/problem_statement_and_requirements.instructions.md#features-that-are-planned-but-have-not-yet-been-elaborated) pending further elaboration.
@@ -222,15 +224,15 @@ The [development approach instructions](.github/instructions/development_approac
 $ clojure -M:test
 
 # Integration tests (requires Snowflake connection)
-export SNOWFLAKE_PASSWORD="your-actual-password"
+$ export SNOWFLAKE_PASSWORD="your-actual-password"
 $ clojure -M:integration
 
 # UAT tests (requires Snowflake connection)
-export SNOWFLAKE_PASSWORD="your-actual-password"
+$ export SNOWFLAKE_PASSWORD="your-actual-password"
 $ clojure -M:uat
 
 # All tests
-export SNOWFLAKE_PASSWORD="your-actual-password"
+$ export SNOWFLAKE_PASSWORD="your-actual-password"
 $ clojure -M:test && clojure -M:integration && clojure -M:uat
 ```
 
@@ -251,6 +253,8 @@ Start a REPL with development dependencies:
 ```bash
 $ clj -M:dev
 ```
+
+### Logging
 
 The library uses structured logging with SLF4J. Configure logging levels in `resources/simplelogger.properties`.
 
