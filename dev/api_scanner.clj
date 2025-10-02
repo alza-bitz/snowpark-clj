@@ -36,7 +36,7 @@
 (comment
   (with-open [cg-scan-result (cg-scan "com.snowflake.snowpark_java")]
     (transduce
-     (class-info->scan-result "https://javadoc.snowflake.com/snowpark-java/1.16.0")
+     (class-info->scan-result "https://docs.snowflake.com/developer-guide/snowpark/reference/java")
      conj
      (take 1 (.getAllClasses cg-scan-result)))))
 
@@ -59,7 +59,7 @@
 
 (comment
   (scan-package {:package "com.snowflake.snowpark_java"
-                 :javadoc-base "https://javadoc.snowflake.com/snowpark-java/1.16.0"}))
+                 :javadoc-base "https://docs.snowflake.com/developer-guide/snowpark/reference/java"}))
 
 (defn- file->github-url
   "Convert to a GitHub source URL."

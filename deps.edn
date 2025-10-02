@@ -39,7 +39,7 @@
   :api-scanner-snowpark {:extra-paths ["dev"]
                          :exec-fn api-scanner/scan-package
                          :exec-args {:package "com.snowflake.snowpark_java"
-                                     :javadoc-base "https://javadoc.snowflake.com/snowpark-java/1.14.0"}}
+                                     :javadoc-base "https://docs.snowflake.com/developer-guide/snowpark/reference/java"}} 
   :api-scanner-snowpark-clj {:extra-paths ["dev"]
                              :exec-fn api-scanner/scan-ns
                              :exec-args {:namespace snowpark-clj.core
