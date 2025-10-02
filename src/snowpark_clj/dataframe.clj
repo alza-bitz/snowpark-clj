@@ -58,6 +58,9 @@
    - schema: Snowpark StructType schema for explicit schema definition
    
    Returns: A dataframe wrapper with the session options and map-like column access"
+  #:scanner{:class "com.snowflake.snowpark_java.Session"
+            :method "createDataFrame"
+            :params ["com.snowflake.snowpark_java.Row[]" "com.snowflake.snowpark_java.types.StructType"]}
   ([session data]
    (when (empty? data)
      (throw (IllegalArgumentException. "Cannot create dataframe from empty data"))) 
@@ -79,6 +82,9 @@
    - table-name: Name of the table
    
    Returns: A dataframe wrapper with the session options and map-like column access"
+  #:scanner{:class "com.snowflake.snowpark_java.Session"
+            :method "table"
+            :params ["java.lang.String"]}
   [session table-name]
   (let [raw-session (wrapper/unwrap session)
         dataframe (.table raw-session table-name)]
@@ -92,6 +98,9 @@
    - query: SQL query to execute
    
    Returns: A dataframe wrapper with the session options and map-like column access"
+  #:scanner{:class "com.snowflake.snowpark_java.Session"
+            :method "sql"
+            :params ["java.lang.String"]}
   [session query]
   (let [raw-session (wrapper/unwrap session)
         dataframe (.sql raw-session query)]
@@ -107,6 +116,10 @@
    - cols: Single column or vector of columns (Column objects or column keys that will be transformed using key->col-fn)
    
    Returns: A dataframe wrapper"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "select"
+            :params [["java.lang.String[]"]
+                     ["com.snowflake.snowpark_java.Column[]"]]}
   [df cols]
   (let [raw-df (wrapper/unwrap df)
         key->col-fn (wrapper/unwrap-option df :key->col-fn)
@@ -122,6 +135,9 @@
    - condition: Column object or column key that will be transformed using key->col-fn
    
    Returns: A dataframe wrapper"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "filter"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [df condition]
   (let [raw-df (wrapper/unwrap df)
         key->col-fn (wrapper/unwrap-option df :key->col-fn)
@@ -133,6 +149,9 @@
 
 (defn where
   "Alias for df-filter"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "where"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [df condition]
   (df-filter df condition))
 
@@ -144,6 +163,9 @@
    - n: Number of rows to limit to
    
    Returns: A dataframe wrapper"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "limit"
+            :params ["int"]}
   [df n]
   (let [raw-df (wrapper/unwrap df)
         result-df (.limit raw-df n)]
@@ -157,6 +179,9 @@
    - cols: Single column or vector of columns (Column objects or column keys that will be transformed using key->col-fn)
    
    Returns: A dataframe wrapper"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "sort"
+            :params ["com.snowflake.snowpark_java.Column[]"]}
   [df cols]
   (let [raw-df (wrapper/unwrap df)
         key->col-fn (wrapper/unwrap-option df :key->col-fn)
@@ -172,6 +197,10 @@
    - cols: Single column or vector of columns (Column objects or column keys that will be transformed using key->col-fn)
    
    Returns: A grouped dataframe wrapper"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "groupBy"
+            :params [["java.lang.String[]"]
+                     ["com.snowflake.snowpark_java.Column[]"]]}
   [df cols]
   (let [raw-df (wrapper/unwrap df)
         key->col-fn (wrapper/unwrap-option df :key->col-fn)
@@ -187,6 +216,9 @@
    - cols: Single column or vector of columns (Column objects or column keys that will be transformed using key->col-fn)
 
    Returns: a dataframe wrapper"
+  #:scanner{:class "com.snowflake.snowpark_java.RelationalGroupedDataFrame"
+            :method "agg"
+            :params ["com.snowflake.snowpark_java.Column[]"]}
   [df cols]
   (let [raw-df (wrapper/unwrap df)
         key->col-fn (wrapper/unwrap-option df :key->col-fn)
@@ -228,6 +260,9 @@
    - df: Dataframe wrapper
    
    Returns: Vector of maps with column names transformed using col->key-fn"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "collect"
+            :params []}
   [df]
   (let [raw-df (wrapper/unwrap df)
         col->key-fn (wrapper/unwrap-option df :col->key-fn)
@@ -243,6 +278,9 @@
    - n: Optional number of rows to show (default 20)
    
    Side effect: Prints to stdout"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "show"
+            :params ["int"]}
   ([df] (show df 20))
   ([df n]
    (let [raw-df (wrapper/unwrap df)]
@@ -255,6 +293,9 @@
    - df: Dataframe wrapper
    
    Returns: Long"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "count"
+            :params []}
   [df]
   (let [raw-df (wrapper/unwrap df)]
     (.count raw-df)))
@@ -285,6 +326,9 @@
       :cluster-by [\"col1\" \"col2\"]       ; Cluster columns
       :table-type \"transient\"             ; Table type
       ...}                                  ; Other Snowflake writer options"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrameWriter"
+            :method "saveAsTable"
+            :params ["java.lang.String"]}
   ([df table-name]
    (let [raw-df (wrapper/unwrap df)
          writer (.write raw-df)]
@@ -318,6 +362,9 @@
    - col-name: column key (will be transformed using key->col-fn)
    
    Returns: Snowpark Column object"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "col"
+            :params ["java.lang.String"]}
   [df col-name]
   (let [raw-df (wrapper/unwrap df)
         key->col-fn (wrapper/unwrap-option df :key->col-fn)]
@@ -327,6 +374,9 @@
 
 (defn schema
   "Get the schema of a dataframe"
+  #:scanner{:class "com.snowflake.snowpark_java.DataFrame"
+            :method "schema"
+            :params []}
   [df]
   (let [raw-df (wrapper/unwrap df)]
     (.schema raw-df)))

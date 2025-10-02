@@ -1,5 +1,5 @@
 {:paths ["src" "resources"]
- :deps {org.clojure/clojure {:mvn/version "1.12.0"} 
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
         aero/aero {:mvn/version "1.1.6"}
         com.github.igrishaev/mask {:mvn/version "0.1.1"}
         com.snowflake/snowpark {:mvn/version "1.14.0"}
@@ -9,6 +9,9 @@
  {:dev {:extra-paths ["dev" "test" "integration" "uat"]
         :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
                      org.clojure/tools.namespace {:mvn/version "1.5.0"}
+                     io.github.classgraph/classgraph {:mvn/version "4.8.181"}
+                     net.cgrand/xforms {:mvn/version "0.19.6"}
+                     selmer/selmer {:mvn/version "1.12.61"}
                      tortue/spy {:mvn/version "2.15.0"}}
         :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"]}
   :test {:extra-paths ["test"]
@@ -32,4 +35,16 @@
         :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"]
         :main-opts ["-m" "cognitect.test-runner"
                     "-d" "uat"]
-        :exec-fn cognitect.test-runner.api/test}}}
+        :exec-fn cognitect.test-runner.api/test}
+  :api-scanner-snowpark {:extra-paths ["dev"]
+                         :exec-fn api-scanner/scan-package
+                         :exec-args {:package "com.snowflake.snowpark_java"
+                                     :javadoc-base "https://docs.snowflake.com/developer-guide/snowpark/reference/java"}} 
+  :api-scanner-snowpark-clj {:extra-paths ["dev"]
+                             :exec-fn api-scanner/scan-ns
+                             :exec-args {:namespace snowpark-clj.core
+                                         :github-base "https://github.com/alza-bitz/snowpark-clj/tree/main/src"}}
+  :api-coverage-generate {:extra-paths ["dev"]
+                          :exec-fn api-coverage/generate}
+  :api-coverage-render {:extra-paths ["dev"]
+                        :exec-fn api-coverage/render}}}
