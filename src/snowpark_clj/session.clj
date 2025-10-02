@@ -30,6 +30,9 @@
      - :key->col-fn - function to transform map keys on dataset write operations
    
    Returns: A session wrapper with the session options"
+  #:scanner{:class "com.snowflake.snowpark_java.Session"
+            :method "builder"
+            :params []} 
   ([config]
    (create-session config {}))
   ([config {:keys [col->key-fn key->col-fn] :or {col->key-fn (:col->key-fn default-opts)
@@ -53,5 +56,8 @@
 
 (defn close-session
   "Close a session"
+  #:scanner{:class "com.snowflake.snowpark_java.Session"
+            :method "close"
+            :params []}
   [session-wrapper]
   (.close (wrapper/unwrap session-wrapper)))

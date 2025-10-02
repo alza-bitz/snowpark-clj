@@ -28,7 +28,7 @@
   collect row-count show save-as-table col schema]
 
  [snowpark-clj.functions
-  lit avg sum upper lower])
+  expr lit avg sum upper lower])
 
 ;; Secondly we re-export the functions that do have conflicts with clojure core
 

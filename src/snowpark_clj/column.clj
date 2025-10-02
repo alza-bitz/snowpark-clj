@@ -4,31 +4,49 @@
 
 (defn gt
   "Greater than comparison"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "gt"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [col1 col2]
   (.gt col1 col2))
 
 (defn lt
-  "Less than comparison" 
+  "Less than comparison"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "lt"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [col1 col2]
   (.lt col1 col2))
 
 (defn eq
   "Equal comparison"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "equal_to"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [col1 col2]
   (.equal_to col1 col2))
 
 (defn geq
   "Greater than or equal comparison"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "geq"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [col1 col2]
   (.geq col1 col2))
 
 (defn leq
   "Less than or equal comparison"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "leq"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [col1 col2]
   (.leq col1 col2))
 
 (defn neq
   "Not equal comparison"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "not_equal"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [col1 col2]
   (.not_equal col1 col2))
 
@@ -36,16 +54,25 @@
 
 (defn and-fn
   "Logical AND"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "and"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [col1 col2]
   (.and col1 col2))
 
 (defn or-fn
   "Logical OR"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "or"
+            :params ["com.snowflake.snowpark_java.Column"]}
   [col1 col2]
   (.or col1 col2))
 
 (defn not-fn
   "Logical NOT"
+  #:scanner{:class "com.snowflake.snowpark_java.Column"
+            :method "not"
+            :params []}
   [col]
   (.not col))
 
