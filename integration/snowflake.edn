@@ -1,4 +1,4 @@
-{:url "https://vkvupnf-yyb56283.snowflakecomputing.com"
+{:url "https://hipvlff-dd85657.snowflakecomputing.com"
  :user "ALZA"
  :password #mask #env "SNOWFLAKE_PASSWORD"
  :role "SNOWFLAKE_LEARNING_ROLE"

@@ -8,7 +8,7 @@
    [snowpark-clj.config :as config]))
 
 (def test-config
-  {:url "https://vkvupnf-yyb56283.snowflakecomputing.com"
+  {:url "https://hipvlff-dd85657.snowflakecomputing.com"
    :user "ALZA"
    :role "SNOWFLAKE_LEARNING_ROLE"
    :warehouse "SNOWFLAKE_LEARNING_WH"
